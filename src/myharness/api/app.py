@@ -21,18 +21,23 @@ from myharness.core.config import get_settings
 logger = structlog.get_logger(__name__)
 
 
-def create_app(supervisor: Any = None) -> FastAPI:
+def create_app(supervisor: Any = None, auto_boot: bool = True) -> FastAPI:
     """Create and configure the FastAPI application.
 
     Application factory pattern — allows creating multiple app instances
     for testing and supports both DI-driven and manually-wired setups.
 
-    If supervisor is None, the app will lazily build one from the DI
-    container on first request (via dependencies.py).
+    If supervisor is None and auto_boot is True (default), the lifespan
+    will build a supervisor from the DI container and call boot() during
+    startup. Tests that need to control the supervisor lifecycle can
+    pass auto_boot=False.
 
     Args:
         supervisor: Optional pre-built HarnessSupervisor instance.
                     If None, DI container handles wiring.
+        auto_boot: When True (default), automatically build and boot the
+                   supervisor during lifespan startup. Set to False for
+                   tests that manage the supervisor lifecycle manually.
 
     Returns:
         A fully configured FastAPI application ready to serve.
@@ -44,6 +49,20 @@ def create_app(supervisor: Any = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         """Application lifespan — handles startup and shutdown."""
         sv = _supervisor_ref["instance"]
+
+        # If no supervisor was injected and auto_boot is enabled, try to
+        # build one from the DI container so boot() runs during startup.
+        if sv is None and auto_boot:
+            try:
+                from myharness.api.dependencies import get_container
+                from myharness.harness.supervisor import HarnessSupervisor
+
+                container = get_container()
+                sv = container.resolve(HarnessSupervisor)
+                _supervisor_ref["instance"] = sv
+                logger.info("api_startup_supervisor_from_di")
+            except Exception:
+                logger.exception("supervisor_resolve_failed")
 
         # On startup
         if sv is not None:

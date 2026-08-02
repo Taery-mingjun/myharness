@@ -41,6 +41,7 @@ class IdentityUpdateRequest(BaseModel):
     else is carried over from the current identity.
     """
 
+    name: str | None = None
     core_values: list[str] | None = None
     mission: str | None = None
     preferences: dict[str, Any] | None = None

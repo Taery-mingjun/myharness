@@ -196,7 +196,7 @@ class LLMEngine:
         """Name of the currently active LLM provider."""
         return self._provider.provider_name
 
-    async def switch_provider(self, provider: LLMProvider) -> None:
+    def switch_provider(self, provider: LLMProvider) -> None:
         """Switch to a different LLM provider at runtime.
 
         Per P8: Provider switching does not affect state because

@@ -57,9 +57,15 @@ class Settings(BaseSettings):
         default="llama3.1", description="Default local model via Ollama"
     )
 
+    # Generic OpenAI-compatible provider (Agnes, Together, vLLM, etc.)
+    openai_compatible_api_key: str = Field(default="", description="API key for OpenAI-compatible backend")
+    openai_compatible_base_url: str = Field(default="", description="Base URL for OpenAI-compatible backend")
+    openai_compatible_default_model: str = Field(default="gpt-4o", description="Default model for OpenAI-compatible backend")
+    openai_compatible_provider_name: str = Field(default="openai_compatible", description="Logical provider name for OpenAI-compatible backend")
+
     default_llm_provider: str = Field(
         default="openai",
-        description="Default LLM provider: openai|anthropic|google|qwen|deepseek|local",
+        description="Default LLM provider: openai|anthropic|google|qwen|deepseek|local|openai_compatible",
     )
 
     # Embedding backend — may differ from the cognitive provider. Anthropic

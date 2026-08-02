@@ -22,6 +22,7 @@ from myharness.llm.providers.openai import OpenAIProvider
 from myharness.llm.providers.openai_compatible import (
     DeepSeekProvider,
     LocalProvider,
+    OpenAICompatibleProvider,
     QwenProvider,
 )
 
@@ -44,6 +45,7 @@ _PROVIDER_REGISTRY: dict[str, type[LLMProvider]] = {
     "qwen": QwenProvider,
     "deepseek": DeepSeekProvider,
     "local": LocalProvider,
+    "openai_compatible": OpenAICompatibleProvider,
 }
 
 
@@ -147,6 +149,27 @@ def create_provider(
         return LocalProvider(
             default_model=settings.ollama_default_model,
             base_url=f"{settings.ollama_base_url}/v1",
+        )
+
+    if name == "openai_compatible":
+        # Generic OpenAI-compatible provider — supports any backend that
+        # speaks the OpenAI chat-completions protocol (Agnes, Together,
+        # Anyscale, vLLM, etc.). Configuration is fully env-driven.
+        api_key = getattr(settings, "openai_compatible_api_key", "")
+        base_url = getattr(settings, "openai_compatible_base_url", "")
+        default_model = getattr(settings, "openai_compatible_default_model", "gpt-4o")
+        provider_name = getattr(settings, "openai_compatible_provider_name", "openai_compatible")
+        if not api_key:
+            raise ProviderNotAvailableError(
+                "OpenAI-compatible API key is not configured. Set MYH_OPENAI_COMPATIBLE_API_KEY.",
+                code="OPENAI_COMPATIBLE_NOT_CONFIGURED",
+                details={"env_var": "MYH_OPENAI_COMPATIBLE_API_KEY"},
+            )
+        return OpenAICompatibleProvider(
+            api_key=api_key,
+            default_model=default_model,
+            base_url=base_url,
+            provider_name=provider_name,
         )
 
     raise ProviderNotAvailableError(

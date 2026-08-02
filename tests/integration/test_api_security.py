@@ -120,7 +120,7 @@ class TestFailClosedWithoutKey:
 
         from myharness.api.app import create_app
 
-        with TestClient(create_app()) as client:
+        with TestClient(create_app(auto_boot=False)) as client:
             yield client
 
         get_settings.cache_clear()
