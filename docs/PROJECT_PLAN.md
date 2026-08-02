@@ -30,10 +30,30 @@
 | **S4 按 v1.1 实施** | 依路线图顺序实施：① Memory API（含 Identity，设计稿 14.2 优先）→ ② Event Schema → ③ LLM Provider 接口 → ④ Skill Interface → ⑤ Execution Driver | 代码 + 协议文档 | ⬜ |
 | **S5 验证发布** | 全量测试（pytest）、文档完善、版本标记、gitee 发布 | 通过 CI + v0.2.0 发布 | ⬜ |
 
-## 4. 路线图（S3 后更新）
+## 4. 路线图（S3 决策后定稿）
 
-- 暂定优先级（设计稿 14.6 建议）：**Memory API（含 Identity 子系统）优先**——已有实测经验（衍生数据分离、索引重建可行性已验证）
-- Skill Interface / Execution Driver 待接入真实执行设备后再具体化
+**S3 结论：无需重建**（S1：282 测试全过、逐章符合）+ **采用成熟组件防重复造轮子**（S2：14 次 WebSearch 核实）。
+
+### 4.1 技术选型决策
+
+| 层 | 决策 | 依据 |
+|---|---|---|
+| LLM Provider（14.5） | **保留自研 4 适配器**（openai/anthropic/gemini/openai_compatible，已满足 P8）；LiteLLM 作可选扩展（文档标注，锁版本） | 现有测试全过；LiteLLM 有 2026-03 PyPI 投毒事件 |
+| 记忆层（14.2） | **自研保持**；Relationship 层借鉴 Graphiti 三子图+双时间模式（P2）；Identity 必须自研 | 无开源项目完整实现四类子存储 + Read/Write/Search/Archive |
+| 事件总线（14.1） | **自研薄层保持**（总线是实现，Event Schema 才是协议）；预留 NATS/JetStream、Redis Streams 适配器（P2） | pypubsub 无 async、dramatiq 是任务队列 |
+| Execution / MCP（14.4） | **采用官方 MCP SDK 实现真实驱动**（S4 必做，现为 stub）；tools/list 即 Capability Discovery；tool poisoning 由 guard/monitor 应对 | MCP 已是行业标准（2026-07 新规范、AAIF 基金会） |
+| 向量检索 | **保持 faiss-cpu**（P9 最契合：索引=纯衍生数据可删重建）；联合查询升级 sqlite-vec（P2） | Chroma 原始/衍生混存不符 P9 |
+| Skill 引擎（14.3） | **自研保持**；状态机对照 Nacos Skill Registry（draft→reviewing→online→offline）、SkillHub（SemVer 不可变版本）模式 | 无开源完整生命周期实现 |
+
+### 4.2 S4 实施顺序（定稿）
+
+1. **协议文档五份**（docs/protocol/：14.1 Event Schema / 14.2 Memory API / 14.3 Skill Interface / 14.4 Execution Driver / 14.5 LLM Provider）—— P0-C
+2. **Event Schema 规范化**：BaseEvent 加 priority 字段 + 27 种事件 payload 强类型化 —— P0-A/B
+3. **MCP 驱动真实实现**：官方 Python SDK 接入 —— 采用成熟技术落地
+4. **skill 测试补强**至 ≥85% —— P1-D
+5. **P2 优化**：Graphiti 模式、NATS/sqlite-vec 预留、LiteLLM 文档
+
+> 原定"Memory API 优先实施"（设计稿 14.6）修正：代码已实现 Memory API，S4 优先做**协议文档沉淀**，Memory API 的文档在五份中排第 2 位。
 
 ## 5. 工程规范标准
 

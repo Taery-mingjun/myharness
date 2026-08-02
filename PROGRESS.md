@@ -9,8 +9,8 @@
 |---|---|---|---|
 | S0 基线 | ✅ | 2026-08-02 | 权限免审批、计划书、规范、追踪机制、CLAUDE.md |
 | S1 现有代码审查 | ✅ | 2026-08-02 | 282 测试全过、67% 覆盖；报告 docs/REVIEW_REPORT.md |
-| S2 开源轮子调研 | 🔄 | — | 子代理调研中，产出 docs/OPENSOURCE_SURVEY.md |
-| S3 差距决策 | ⬜ | — | |
+| S2 开源轮子调研 | ✅ | 2026-08-02 | 14 次 WebSearch 核实，产出 docs/OPENSOURCE_SURVEY.md |
+| S3 差距决策 | ✅ | 2026-08-02 | 无需重建 + 选型定稿，路线图更新于 PROJECT_PLAN.md §4 |
 | S4 按 v1.1 实施 | ⬜ | — | |
 | S5 验证发布 | ⬜ | — | |
 
@@ -21,3 +21,5 @@
 - **2026-08-02 S0** — git 历史：`373c4b3`（初始）→ `a18e03b`（CLAUDE.md）；工作区遗留 2 个未提交修改（memory/storage/source.py、tests/integration/test_runtime_loop.py，旧会话产物，S1 审查时一并评估）
 - **2026-08-02 S1** — 结论：**无需重建**。现有代码与 v1.1 设计稿逐章对应，282 测试全通过、覆盖 67%。已提交遗留修改（`309d9d2`，Windows 并发写入/CPU 计时修复，评估为高质量保留）
 - **2026-08-02 S1** — 发现 P0 缺口 3 项：① Event Schema 缺 priority 字段、载荷未强类型化（设计稿 14.1）；② 五个协议规范文档缺失（docs/protocol/，设计稿 14.x 核心交付物）。P1 缺口：skill 模块测试覆盖不足（60–72%）。详见 docs/REVIEW_REPORT.md
+- **2026-08-02 S2** — 开源调研定稿（docs/OPENSOURCE_SURVEY.md）：直接采用 4 件（LiteLLM 可选、MCP SDK、faiss-cpu 保持、技能注册表模式参照），必须自研 5 件（记忆层、Event Bus、Skill Store、Harness、Provider 协议）；OpenClaw 缺陷验证用户直觉（技能=提示词、记忆弱、单线程）
+- **2026-08-02 S3** — 差距决策：**无需重建**；MCP 驱动现为 stub，S4 采用官方 SDK 实现；LiteLLM 因 PyPI 投毒事件只作可选扩展；Event Schema 协议文档优先于代码改动。路线图定稿见 PROJECT_PLAN.md §4
