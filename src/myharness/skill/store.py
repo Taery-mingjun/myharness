@@ -14,7 +14,6 @@ import structlog
 
 from myharness.core.exceptions import (
     SkillError,
-    SkillLifecycleError,
     SkillNotFoundError,
     SkillValidationError,
 )

@@ -8,11 +8,10 @@ concrete actions on a specific driver.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ── Capability Action ──────────────────────────────────────────────────
 
@@ -60,7 +59,7 @@ class CapabilityDescriptor(BaseModel):
         description="Constraints: rate limits, permissions, preconditions",
     )
     version: str = Field(default="0.1.0")
-    registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_seen: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    registered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_seen: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     model_config = {"json_schema_extra": {"source_of_truth": False}}

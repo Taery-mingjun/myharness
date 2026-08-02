@@ -6,13 +6,14 @@ In the MVP, this is a stub that returns ExecutionResult with success=False.
 
 from __future__ import annotations
 
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import structlog
 
 from myharness.driver.protocol import UnifiedDriverProtocol
 from myharness.schema.capability import CapabilityAction, CapabilityDescriptor
-from myharness.schema.driver import ExecutionResult, ExecutionProgress
+from myharness.schema.driver import ExecutionProgress, ExecutionResult
 
 logger = structlog.get_logger(__name__)
 

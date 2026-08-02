@@ -77,7 +77,7 @@ def create_app(supervisor: Any = None) -> FastAPI:
             "MyHarness implements a four-power-separation architecture "
             "(LLM / Memory / Skill / Execution) for AI agents."
         ),
-        version="0.1.0",
+        version="0.2.0",
         lifespan=lifespan,
         docs_url="/docs",
         redoc_url="/redoc",
@@ -100,7 +100,7 @@ def create_app(supervisor: Any = None) -> FastAPI:
 
     # Register API routers
     from myharness.api.dependencies import verify_api_key
-    from myharness.api.routers import cognitive, memory, skill, driver, harness, health
+    from myharness.api.routers import cognitive, driver, harness, health, memory, skill
 
     # Authentication is applied at the ROUTER level, not per-endpoint.
     #
@@ -150,5 +150,5 @@ def create_app(supervisor: Any = None) -> FastAPI:
     # it without credentials. It must therefore never leak internal state.
     app.include_router(health.router, tags=["Health"])
 
-    logger.info("api_app_created", version="0.1.0")
+    logger.info("api_app_created", version="0.2.0")
     return app

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -55,7 +55,7 @@ def _walk_plan() -> Plan:
             ),
         ],
         reasoning="Direct route to the destination",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         current_step=1,  # s1 already done; interrupted partway through s2
     )
 

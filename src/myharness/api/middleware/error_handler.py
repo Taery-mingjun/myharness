@@ -78,14 +78,14 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             An appropriate HTTP status code.
         """
         from myharness.core.exceptions import (
-            MemoryNotFoundError,
-            SkillNotFoundError,
-            DriverNotAvailableError,
             CapabilityNotFoundError,
-            ProviderNotAvailableError,
-            SkillValidationError,
-            SkillLifecycleError,
+            DriverNotAvailableError,
             IdentityConflictError,
+            MemoryNotFoundError,
+            ProviderNotAvailableError,
+            SkillLifecycleError,
+            SkillNotFoundError,
+            SkillValidationError,
         )
 
         # 404 — not found

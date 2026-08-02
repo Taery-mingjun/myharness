@@ -5,10 +5,8 @@
 **MyHarness（MYH）**：一个认知操作系统（Cognitive Operating System），实现 LLM Agent 的**四权分离**架构——Compute（算力）、Memory（记忆）、Skill（能力）、Execution（执行）完全解耦。
 
 - 远程仓库（唯一真相源）：`https://gitee.com/Taery-mingjun/myharness`
-- 本工程目录：`C:\Users\10444\gitee_myharness_fetch\myharness\`（git 克隆，remote = origin/main）
-- 核心大纲：桌面 `C:\Users\10444\Desktop\myharness1.1(1).pdf`（MyHarness Architecture Design v1.1，2026-08-02）
-
-> ⚠️ **工程边界**：本工程是 myharness 的**唯一**工作目录。桌面的 `JARVIS_CONSOLE`、`jarvis-carrier-protocol`、`Harness+v2.0（最终定稿）.pdf` 等是其他项目/历史文档，**不要混淆、不要在本工程中引用其内容**。与设计文档冲突时以 `myharness1.1(1).pdf` 为准。
+- GitHub 镜像：`https://github.com/Taery-mingjun/myharness`
+- 设计基准：MyHarness Architecture Design v1.1
 
 ## 核心大纲（v1.1 设计文档要点）
 
@@ -41,34 +39,29 @@ LLM ≠ Agent ≠ Memory ≠ Skill ≠ Execution ≠ Hardware。所有模块完�
 
 ### Protocol v0.1 规范化路线图（14.x）
 1. **14.1 Event Schema** — 通用字段（类型/来源/时间戳/载荷/优先级）+ 各类事件载荷格式
-2. **14.2 Memory API** — ⚠️ **建议优先实施**（已有实测经验：衍生数据分离、索引重建可行性已验证）
+2. **14.2 Memory API** — Memory 接口规范
 3. **14.3 Skill Interface** — 标准描述格式、生命周期状态迁移、版本管理
 4. **14.4 Execution Driver Interface** — 统一驱动协议、Capability Discovery、安全校验接口
 5. **14.5 LLM Provider Interface** — Think/Plan/Reflect/Compile 标准输入输出、引擎切换迁移规范
 
-实施顺序：**优先 Memory API（含 Identity 子系统）**；Skill Interface 与 Execution Driver Interface 待接入真实执行设备后再具体化，避免过度设计。
+## 当前工程状态
 
-## 当前工程状态（2026-08-02）
-
-- **git**：仅 1 个提交 `373c4b3 fix(api): PUT /memory/identity rejected every request it ever received`；有未提交修改：`src/myharness/memory/storage/source.py`、`tests/integration/test_runtime_loop.py`
+- **版本**：v0.2.0（2026-08-02）
 - **技术栈**：Python ≥3.11、hatchling 构建、FastAPI/uvicorn、pydantic v2、aiosqlite、faiss-cpu、lagom（DI）、networkx、structlog；dev 依赖 pytest + pytest-asyncio + ruff + mypy(strict)
 - **源码结构**（src/myharness/）：core（配置/DI/异常/日志）、schema、bus（事件总线）、memory、llm、skill、harness（含 guard/monitor/compatibility）、runtime、driver（adapters: robot/browser/mcp/api/computer/database/iot）、api（FastAPI：routers 含 memory/skill/harness/driver/cognitive/health）
-- **测试**：tests/ 下 unit/ + integration/（含 test_runtime_loop.py），conftest.py 提供夹具
-- **环境**：`.venv/` 已建；`.env.example` 可复制为 `.env` 填 LLM API Keys
-- **待确认参考**：`C:\Users\10444\.claude\plans\myharness-bubbly-cloud.md` 是旧会话（安全审计向）写的 B2/B3/B4 落地计划（登录限速、shell 沙箱、TLS 前置）——**尚未与本 v1.1 大纲对齐，执行任何内容前需用户确认**
+- **测试**：349 测试全部通过，覆盖率 70%
+- **环境**：`.env.example` 可复制为 `.env` 填 LLM API Keys
 
-## 工程计划与追踪（必读）
+## 工程计划与追踪
 
 - **工程落地计划书**：`docs/PROJECT_PLAN.md` —— 阶段划分 S0–S5、工程规范、多 agent 模块所有权矩阵与防冲突规则
-- **进度追踪**：`PROGRESS.md` —— 阶段状态 + 决策记录，每阶段完成必须更新并提交 gitee
-- 当前阶段：S0–S4 全部完成 ✅ / S5 验证发布（进行中，2026-08-02）
-- S4 成果：协议文档 `docs/protocol/01–05`、Event 强类型化（priority + 27 载荷模型）、MCP 真实驱动（官方 SDK）、skill 测试 98–100%；349 测试通过、覆盖 70%
+- **进度追踪**：`PROGRESS.md` —— 阶段状态 + 决策记录
+- 当前阶段：S0–S5 全部完成 ✅
+- S4 成果：协议文档 `docs/protocol/01–05`、Event 强类型化（priority + 27 载荷模型）、MCP 真实驱动（官方 SDK）、skill 测试 98–100%
 - 多 agent 规则：一次一个 agent 一个模块；分支隔离；改动登记到 PROGRESS.md；harness/core 改动需用户知悉
 
-## 工作约定（防多会话混乱）
+## 工作约定
 
-1. **所有会话必须在本目录打开**（`cd C:\Users\10444\gitee_myharness_fetch\myharness`），不要从 C:\Users\10444 或 D:\Microsoft VS Code 根目录开工作会话
-2. 新任务先看本文件；已读过的进度不要再重复摸索
-3. 修改前先 `git status` 确认工作区状态；commit/push 需用户明确要求
-4. 需要恢复上下文时用 `/resume` 恢复旧会话，不要开新会话从头做
-5. 涉及设计方案的问题，先读桌面 `myharness1.1(1).pdf`（本文件已含摘要，细节查 PDF）
+1. 新任务先看本文件；已读过的进度不要再重复摸索
+2. 修改前先 `git status` 确认工作区状态；commit/push 需用户明确要求
+3. 涉及设计方案的问题，先读本文件的架构摘要，细节查 `docs/` 下的协议文档

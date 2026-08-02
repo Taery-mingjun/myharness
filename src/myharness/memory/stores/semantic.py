@@ -6,12 +6,10 @@ updates to derived indexes.
 
 from __future__ import annotations
 
-import json
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import structlog
 
-from myharness.core.exceptions import MemoryNotFoundError
 from myharness.schema.memory import (
     MemoryCategory,
     MemoryQuery,
@@ -20,9 +18,9 @@ from myharness.schema.memory import (
 )
 
 if TYPE_CHECKING:
-    from myharness.memory.storage.source import SourceOfTruth
-    from myharness.memory.indexing.vector import VectorIndex
     from myharness.memory.indexing.text import TextIndex
+    from myharness.memory.indexing.vector import VectorIndex
+    from myharness.memory.storage.source import SourceOfTruth
 
 logger = structlog.get_logger(__name__)
 

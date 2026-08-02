@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = Field(default="", description="Anthropic API key")
     anthropic_default_model: str = Field(
-        default="claude-3-opus-20240229", description="Default Anthropic model"
+        default="claude-sonnet-4-20250514", description="Default Anthropic model"
     )
 
     google_api_key: str = Field(default="", description="Google AI API key")

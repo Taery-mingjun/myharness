@@ -7,13 +7,12 @@ Upper layers (LLM, Skill) never know about specific driver implementations.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from myharness.core.types import DriverId
-
 
 # ── Execution Result ───────────────────────────────────────────────────
 
@@ -41,7 +40,7 @@ class ExecutionProgress(BaseModel):
     progress_pct: float = Field(default=0.0, ge=0.0, le=100.0)
     status: str = Field(default="running", description="Status: running, waiting, finalizing")
     message: str = Field(default="", description="Human-readable progress message")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ── Driver Status ──────────────────────────────────────────────────────
@@ -69,4 +68,4 @@ class DriverInfo(BaseModel):
     version: str = Field(default="0.1.0")
     description: str = Field(default="")
     status: DriverStatus = Field(default_factory=DriverStatus)
-    registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    registered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

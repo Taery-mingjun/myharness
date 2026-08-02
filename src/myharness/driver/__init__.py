@@ -12,10 +12,10 @@ Provides:
 - Adapters: Concrete driver implementations (API, Browser, Database, etc.).
 """
 
-from myharness.driver.protocol import UnifiedDriverProtocol, DriverManager
 from myharness.driver.capability import CapabilityDiscovery
+from myharness.driver.protocol import DriverManager, UnifiedDriverProtocol
 from myharness.driver.translation import ActionTranslator
-from myharness.schema.driver import ExecutionResult, ExecutionProgress
+from myharness.schema.driver import ExecutionProgress, ExecutionResult
 
 __all__ = [
     "UnifiedDriverProtocol",

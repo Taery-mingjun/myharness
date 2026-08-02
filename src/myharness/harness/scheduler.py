@@ -9,9 +9,10 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable
+from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 
@@ -37,7 +38,7 @@ class ScheduledTask:
     action: Callable | None = field(compare=False, default=None)
     timeout: float = field(compare=False, default=300.0)
     created_at: datetime = field(
-        compare=False, default_factory=lambda: datetime.now(timezone.utc)
+        compare=False, default_factory=lambda: datetime.now(UTC)
     )
 
 
@@ -212,7 +213,7 @@ class ResourceScheduler:
                     "success": True,
                     "result": None,
                 }
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 "task_execution_timeout",
                 task_id=task.task_id,

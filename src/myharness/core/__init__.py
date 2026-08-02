@@ -6,36 +6,36 @@ exception hierarchy, type aliases, and structured logging.
 
 from myharness.core.config import Settings, get_settings
 from myharness.core.exceptions import (
-    MyHarnessError,
+    CapabilityNotFoundError,
     ConfigurationError,
+    DriverError,
+    DriverNotAvailableError,
+    EventBusError,
+    ExecutionError,
+    HarnessError,
+    IdentityConflictError,
+    LLMError,
     MemoryError,
     MemoryNotFoundError,
     MemoryWriteError,
-    IdentityConflictError,
-    LLMError,
+    MyHarnessError,
     ProviderError,
     ProviderNotAvailableError,
-    TokenLimitError,
     SkillError,
+    SkillLifecycleError,
     SkillNotFoundError,
     SkillValidationError,
-    SkillLifecycleError,
-    DriverError,
-    DriverNotAvailableError,
-    ExecutionError,
-    CapabilityNotFoundError,
-    EventBusError,
-    HarnessError,
-)
-from myharness.core.types import (
-    MemoryId,
-    SkillId,
-    DriverId,
-    EventId,
-    Embedding,
-    JsonDict,
+    TokenLimitError,
 )
 from myharness.core.logging import configure_logging, get_logger
+from myharness.core.types import (
+    DriverId,
+    Embedding,
+    EventId,
+    JsonDict,
+    MemoryId,
+    SkillId,
+)
 
 __all__ = [
     # Config

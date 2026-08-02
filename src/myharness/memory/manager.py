@@ -8,16 +8,17 @@ relationship) and provides cross-store hybrid search. Implements P9
 from __future__ import annotations
 
 import inspect
+from datetime import UTC
 from typing import Any
 
 import structlog
 
 from myharness.memory.embedder import Embedder, NullEmbedder
 from myharness.memory.interface import MemorySystem
-from myharness.memory.stores.identity import IdentityStore
 from myharness.memory.stores.episodic import EpisodicStore
-from myharness.memory.stores.semantic import SemanticStore
+from myharness.memory.stores.identity import IdentityStore
 from myharness.memory.stores.relationship import RelationshipStore
+from myharness.memory.stores.semantic import SemanticStore
 from myharness.schema.identity import IdentityUpdateProposal
 from myharness.schema.memory import (
     EpisodicEntry,
@@ -225,9 +226,9 @@ class MemoryManager(MemorySystem):
         Returns:
             Number of episodes older than the threshold.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        cutoff = datetime.fromtimestamp(before_timestamp, tz=timezone.utc)
+        cutoff = datetime.fromtimestamp(before_timestamp, tz=UTC)
         count = 0
         async for entry in self._episodic._source.iterate_all("episodic"):
             try:

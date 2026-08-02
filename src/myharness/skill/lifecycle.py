@@ -6,7 +6,7 @@ lifecycle: DRAFT → TESTING → VERIFIED → STABLE → DEPRECATED → ARCHIVED
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 
@@ -110,13 +110,13 @@ class SkillLifecycle:
             from_status=skill.status,
             to_status=to_status,
             reason=reason,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             triggered_by=triggered_by,
         )
 
         skill.status = to_status
         skill.lifecycle_history.append(transition_record)
-        skill.updated_at = datetime.now(timezone.utc)
+        skill.updated_at = datetime.now(UTC)
 
         logger.info(
             "skill_lifecycle_transition",

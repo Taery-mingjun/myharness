@@ -8,13 +8,14 @@ execution target (robot, browser, API, database, etc.).
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import structlog
 
-from myharness.core.exceptions import DriverError, DriverNotAvailableError
+from myharness.core.exceptions import DriverNotAvailableError
 from myharness.schema.capability import CapabilityDescriptor
-from myharness.schema.driver import ExecutionResult, ExecutionProgress
+from myharness.schema.driver import ExecutionProgress, ExecutionResult
 
 logger = structlog.get_logger(__name__)
 

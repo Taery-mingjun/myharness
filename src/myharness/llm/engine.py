@@ -20,12 +20,13 @@ from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
 import structlog
-from jinja2 import Environment, BaseLoader
+from jinja2 import BaseLoader, Environment
 
 from myharness.core.exceptions import ProviderError, TokenLimitError
 from myharness.llm.context import ContextBuilder
@@ -39,7 +40,7 @@ from myharness.llm.prompts import (
     THINK_SYSTEM_PROMPT,
     THINK_USER_PROMPT,
 )
-from myharness.schema.identity import IdentityUpdateProposal, IdentityField
+from myharness.schema.identity import IdentityField, IdentityUpdateProposal
 from myharness.schema.skill import SkillProposal
 
 logger = structlog.get_logger(__name__)
@@ -337,7 +338,7 @@ class LLMEngine:
                 goal=data.get("goal", goal),
                 steps=steps,
                 reasoning=data.get("reasoning", ""),
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
 
             logger.info(

@@ -12,8 +12,6 @@ without affecting identity, memory, or skill state.
 
 from __future__ import annotations
 
-from typing import Any
-
 from myharness.core.exceptions import ProviderError
 from myharness.llm.providers.openai import OpenAIProvider
 

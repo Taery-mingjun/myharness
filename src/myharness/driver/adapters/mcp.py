@@ -20,13 +20,14 @@ authorization on the call path.
 from __future__ import annotations
 
 import time
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import structlog
 
 from myharness.driver.protocol import UnifiedDriverProtocol
 from myharness.schema.capability import CapabilityAction, CapabilityDescriptor
-from myharness.schema.driver import ExecutionProgress, ExecutionResult, DriverStatus
+from myharness.schema.driver import DriverStatus, ExecutionProgress, ExecutionResult
 
 logger = structlog.get_logger(__name__)
 

@@ -10,16 +10,13 @@ System and assembled here per-request.
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from myharness.schema.memory import (
     MemoryCategory,
     MemoryQuery,
-    EpisodicEntry,
-    SemanticEntry,
-    RelationshipEntry,
 )
 
 if TYPE_CHECKING:
@@ -39,7 +36,7 @@ class ContextBuilder:
     no identity, no memory of its own. It is purely a query interface.
     """
 
-    def __init__(self, memory: "MemorySystem") -> None:
+    def __init__(self, memory: MemorySystem) -> None:
         """Initialize with a reference to the Memory System.
 
         Args:

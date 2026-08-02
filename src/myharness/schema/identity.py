@@ -9,14 +9,13 @@ IdentityUpdateProposal — but never directly owns or mutates identity.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from myharness.core.types import MemoryId
-
 
 # ── Identity Fields ────────────────────────────────────────────────────
 
@@ -67,13 +66,13 @@ class Identity(BaseModel):
         default_factory=list,
         description="Explicit rules and constraints governing behavior",
     )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     def bump_version(self) -> None:
         """Increment version and update timestamp on mutation."""
         self.version += 1
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     model_config = {"json_schema_extra": {"source_of_truth": True}}
 
@@ -102,4 +101,4 @@ class IdentityUpdateProposal(BaseModel):
         default_factory=list,
         description="Episode IDs that support this proposal",
     )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -6,10 +6,10 @@ capability — only execution templates.
 """
 
 from myharness.skill.interface import SkillStoreInterface
-from myharness.skill.store import SkillStore
-from myharness.skill.registry import SkillRegistry
 from myharness.skill.lifecycle import SkillLifecycle
+from myharness.skill.registry import SkillRegistry
 from myharness.skill.storage import SkillStorage
+from myharness.skill.store import SkillStore
 from myharness.skill.validator import SkillValidator
 
 __all__ = [

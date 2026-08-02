@@ -357,7 +357,7 @@ class EventBus:
             )
         try:
             event = await asyncio.wait_for(self._event_queue.get(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
         # The caller owns the event from here on.
         self._event_queue.task_done()
@@ -379,7 +379,7 @@ class EventBus:
                 event = await asyncio.wait_for(self._event_queue.get(), timeout=1.0)
                 await self.publish(event)
                 self._event_queue.task_done()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except Exception:
                 self._log.exception("queue_processor_error")

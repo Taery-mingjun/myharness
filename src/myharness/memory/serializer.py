@@ -6,7 +6,6 @@ including datetime and embedding handling for JSON compatibility.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from myharness.schema.memory import (

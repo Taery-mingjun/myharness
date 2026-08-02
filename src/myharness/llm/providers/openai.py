@@ -6,9 +6,11 @@ Supports chat completions, streaming, and embeddings.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from typing import Any
+
 import structlog
 from openai import AsyncOpenAI
-from typing import Any, AsyncIterator
 
 from myharness.core.exceptions import ProviderError, TokenLimitError
 from myharness.llm.interfaces import LLMProvider

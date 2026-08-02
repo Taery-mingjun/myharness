@@ -107,7 +107,7 @@ class Embedder:
             vectors = await asyncio.wait_for(
                 self._port.embed(texts), timeout=self._timeout
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._degraded = True
             logger.warning(
                 "embedding_timed_out_degrading_to_text_only",

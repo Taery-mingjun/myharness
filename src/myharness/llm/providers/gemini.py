@@ -10,10 +10,11 @@ without affecting identity, memory, or skill state.
 
 from __future__ import annotations
 
-import structlog
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import httpx
+import structlog
 
 from myharness.core.exceptions import ProviderError, TokenLimitError
 from myharness.llm.interfaces import LLMProvider

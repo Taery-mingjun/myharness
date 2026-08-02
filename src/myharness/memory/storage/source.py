@@ -266,7 +266,7 @@ class SourceOfTruth:
             return None
 
         try:
-            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(file_path, encoding="utf-8") as f:
                 content = await f.read()
         except OSError as exc:
             raise MemoryCorruptionError(
@@ -448,7 +448,7 @@ class SourceOfTruth:
 
         results: list[dict[str, Any]] = []
         try:
-            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(file_path, encoding="utf-8") as f:
                 index = 0
                 lineno = 0
                 async for line in f:
@@ -490,7 +490,7 @@ class SourceOfTruth:
 
         count = 0
         try:
-            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(file_path, encoding="utf-8") as f:
                 async for line in f:
                     line = line.strip()
                     if not line:
@@ -518,7 +518,7 @@ class SourceOfTruth:
         if not file_path.exists():
             return
 
-        async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+        async with aiofiles.open(file_path, encoding="utf-8") as f:
             async for line in f:
                 line = line.strip()
                 if not line:

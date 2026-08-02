@@ -27,7 +27,7 @@ model and calls the engine with its real signatures.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -40,7 +40,7 @@ __all__ = ["InterruptHandler", "Plan", "PlanStep"]
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _coerce_step(raw: Any) -> PlanStep:

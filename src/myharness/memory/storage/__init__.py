@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from myharness.memory.storage.source import SourceOfTruth
 from myharness.memory.storage.derived import DerivedStorage
+from myharness.memory.storage.source import SourceOfTruth
 
 __all__ = ["SourceOfTruth", "DerivedStorage"]

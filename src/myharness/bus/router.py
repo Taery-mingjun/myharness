@@ -9,11 +9,14 @@ payload conditions.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from myharness.core.logging import get_logger
 from myharness.schema.event import BaseEvent, EventType
+
+if TYPE_CHECKING:
+    from myharness.bus.dispatcher import EventBus
 
 
 @dataclass
@@ -88,14 +91,12 @@ class Router:
         await router.route(event)
     """
 
-    def __init__(self, event_bus: "EventBus") -> None:
+    def __init__(self, event_bus: EventBus) -> None:
         """Initialize the router.
 
         Args:
             event_bus: The EventBus instance to publish routed events to.
         """
-        from myharness.bus.dispatcher import EventBus
-
         self._event_bus: EventBus = event_bus
         self._rules: dict[str, RouteRule] = {}
         self._log = get_logger(__name__, component="router")

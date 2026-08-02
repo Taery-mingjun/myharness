@@ -10,14 +10,13 @@ Implements P3 (Identity Externalization) and P9 (Source/Derived Data Separation)
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from myharness.core.types import MemoryId, Embedding
-
+from myharness.core.types import Embedding, MemoryId
 
 # ── Memory Category ────────────────────────────────────────────────────
 
@@ -69,8 +68,8 @@ class IdentityEntry(BaseModel):
         default_factory=list,
         description="Explicit behavioral rules and constraints",
     )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     model_config = {"json_schema_extra": {"source_of_truth": True}}
 
@@ -86,7 +85,7 @@ class EpisodicEntry(BaseModel):
     """
 
     entry_id: MemoryId = Field(default_factory=lambda: MemoryId(str(uuid.uuid4())))
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     category: str = Field(
         default="general",
         description="Sub-category: conversation, task, observation, learning, etc.",
@@ -138,7 +137,7 @@ class SemanticEntry(BaseModel):
         default="",
         description="Where this knowledge came from (episode_id, user_input, inference)",
     )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     embedding: Embedding | None = Field(
         default=None,
         description="Vector embedding for semantic search (derived data)",
@@ -174,8 +173,8 @@ class RelationshipEntry(BaseModel):
         description="Contextual notes about the relationship",
     )
     metadata: dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     model_config = {"json_schema_extra": {"source_of_truth": True}}
 

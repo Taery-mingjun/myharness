@@ -22,7 +22,7 @@ from myharness.bus.middleware import (
     TracingMiddleware,
 )
 from myharness.bus.result import EventResult
-from myharness.bus.router import RouteRule, Router
+from myharness.bus.router import Router, RouteRule
 
 __all__ = [
     "EventBus",

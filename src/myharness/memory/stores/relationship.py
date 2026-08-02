@@ -7,11 +7,10 @@ pair + relation_type overwrites).
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import structlog
 
-from myharness.core.exceptions import MemoryNotFoundError
 from myharness.schema.memory import RelationshipEntry
 
 if TYPE_CHECKING:

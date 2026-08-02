@@ -14,12 +14,11 @@ Per Protocol 14.1 (docs/protocol/01-event-schema.md):
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ── Event Type Enumeration ────────────────────────────────────────────
 
@@ -92,7 +91,7 @@ class BaseEvent(BaseModel):
 
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: EventType
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     source: str = Field(default="unknown")
     correlation_id: str | None = Field(default=None)
     causation_id: str | None = Field(default=None)
@@ -104,7 +103,7 @@ class BaseEvent(BaseModel):
     @classmethod
     def _ensure_utc(cls, v: Any) -> datetime:
         if isinstance(v, datetime) and v.tzinfo is None:
-            return v.replace(tzinfo=timezone.utc)
+            return v.replace(tzinfo=UTC)
         return v
 
 

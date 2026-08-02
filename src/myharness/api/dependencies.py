@@ -13,7 +13,7 @@ import hmac
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
-from fastapi import HTTPException, Header
+from fastapi import Header, HTTPException
 from structlog import get_logger
 
 from myharness.core.config import get_settings
@@ -22,6 +22,7 @@ logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from lagom import Container
+
     from myharness.bus.dispatcher import EventBus
     from myharness.harness.supervisor import HarnessSupervisor
     from myharness.llm.engine import LLMEngine
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 
 
 @lru_cache(maxsize=1)
-def get_container() -> "Container":
+def get_container() -> Container:
     """Build and cache the DI container.
 
     The container is built once per process and cached. This ensures
@@ -47,7 +48,7 @@ def get_container() -> "Container":
     return build_container(settings)
 
 
-async def get_supervisor() -> "HarnessSupervisor":
+async def get_supervisor() -> HarnessSupervisor:
     """Resolve the HarnessSupervisor from the DI container.
 
     The supervisor is the central orchestrator. All cognitive operations
@@ -62,7 +63,7 @@ async def get_supervisor() -> "HarnessSupervisor":
     return container.resolve(HarnessSupervisor)
 
 
-async def get_memory() -> "MemorySystem":
+async def get_memory() -> MemorySystem:
     """Resolve the MemorySystem from the DI container.
 
     Returns:
@@ -74,7 +75,7 @@ async def get_memory() -> "MemorySystem":
     return container.resolve(MemorySystem)
 
 
-async def get_llm_engine() -> "LLMEngine":
+async def get_llm_engine() -> LLMEngine:
     """Resolve the LLMEngine from the DI container.
 
     Returns:
@@ -86,7 +87,7 @@ async def get_llm_engine() -> "LLMEngine":
     return container.resolve(LLMEngine)
 
 
-async def get_skill_store() -> "SkillStore":
+async def get_skill_store() -> SkillStore:
     """Resolve the SkillStore from the DI container.
 
     Returns:
@@ -98,7 +99,7 @@ async def get_skill_store() -> "SkillStore":
     return container.resolve(SkillStore)
 
 
-async def get_event_bus() -> "EventBus":
+async def get_event_bus() -> EventBus:
     """Resolve the EventBus from the DI container.
 
     Returns:

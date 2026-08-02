@@ -7,7 +7,7 @@ The LLM reads identity and proposes updates, but this store owns the data.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import structlog
@@ -164,7 +164,7 @@ class IdentityStore:
                 )
 
             entry.version = current.version + 1
-            entry.updated_at = datetime.now(timezone.utc)
+            entry.updated_at = datetime.now(UTC)
             await self._persist(entry)
 
             logger.info(

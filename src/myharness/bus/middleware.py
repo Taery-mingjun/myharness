@@ -16,7 +16,6 @@ from typing import Any
 from myharness.core.logging import get_logger
 from myharness.schema.event import BaseEvent
 
-
 # ── Logging Middleware ──────────────────────────────────────────────────
 
 

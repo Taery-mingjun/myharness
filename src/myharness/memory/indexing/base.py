@@ -6,7 +6,7 @@ All indexes are DERIVED DATA per P9 — fully rebuildable from SourceOfTruth.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from myharness.memory.storage.source import SourceOfTruth

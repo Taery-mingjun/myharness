@@ -278,7 +278,7 @@ class HarnessSupervisor:
 
             # Stage 2: Build context from memory (hybrid search)
             context: dict[str, Any] = {"user_id": user_id, "message": message}
-            from myharness.schema.memory import MemoryQuery, MemoryCategory
+            from myharness.schema.memory import MemoryCategory, MemoryQuery
 
             related = await self._memory.search(
                 MemoryQuery(

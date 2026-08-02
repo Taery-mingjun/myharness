@@ -1,6 +1,6 @@
 # MyHarness 工程落地计划书
 
-> 版本：v0.1（2026-08-02）· 依据：桌面 `myharness1.1(1).pdf` 设计稿 · 追踪：本仓库 `PROGRESS.md`
+> 版本：v0.2（2026-08-02）· 依据：MyHarness Architecture Design v1.1 · 追踪：本仓库 `PROGRESS.md`
 
 ## 1. 项目目标
 
@@ -89,5 +89,5 @@
 
 ## 7. 参考
 
-- 设计稿：`C:\Users\10444\Desktop\myharness1.1(1).pdf`（v1.1，2026-08-02）
-- 旧会话遗留：`~/.claude/plans/myharness-bubbly-cloud.md`（B2/B3/B4 安全项，未与 v1.1 对齐，暂缓，S3 决策时一并评估）
+- 设计基准：MyHarness Architecture Design v1.1（2026-08-02）
+- 协议规范：`docs/protocol/01–05`

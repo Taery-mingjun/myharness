@@ -5,12 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from myharness.api.dependencies import get_memory
 from myharness.core.exceptions import IdentityConflictError
-from myharness.schema.memory import MemoryQuery, MemorySearchResult
+from myharness.schema.memory import MemoryQuery
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()

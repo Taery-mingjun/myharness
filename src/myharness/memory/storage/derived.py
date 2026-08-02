@@ -7,13 +7,16 @@ from the SourceOfTruth JSON files. It must never be the sole source of any data.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiosqlite
 
 from myharness.core.logging import get_logger
+
+if TYPE_CHECKING:
+    from myharness.memory.storage.source import SourceOfTruth
 
 logger = get_logger(__name__)
 
@@ -467,7 +470,7 @@ class DerivedStorage:
         await conn.commit()
         logger.info("DerivedStorage: cleared all derived data")
 
-    async def rebuild_from_source(self, source: "SourceOfTruth") -> int:
+    async def rebuild_from_source(self, source: SourceOfTruth) -> int:
         """Fully rebuild all derived data from SourceOfTruth.
 
         This is the key P9 operation: delete all derived data and
@@ -513,7 +516,7 @@ class DerivedStorage:
     def _normalize_timestamp(ts: Any) -> str:
         """Normalize a timestamp to ISO format string."""
         if ts is None:
-            return datetime.now(timezone.utc).isoformat()
+            return datetime.now(UTC).isoformat()
         if isinstance(ts, datetime):
             return ts.isoformat()
         return str(ts)

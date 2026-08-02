@@ -6,13 +6,11 @@ updates to derived indexes. Episodic entries are append-only and immutable.
 
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
-from typing import Any, TYPE_CHECKING
+from datetime import datetime
+from typing import TYPE_CHECKING
 
 import structlog
 
-from myharness.core.exceptions import MemoryNotFoundError, MemoryWriteError
 from myharness.schema.memory import (
     EpisodicEntry,
     MemoryCategory,
@@ -21,10 +19,10 @@ from myharness.schema.memory import (
 )
 
 if TYPE_CHECKING:
-    from myharness.memory.storage.source import SourceOfTruth
-    from myharness.memory.storage.derived import DerivedStorage
-    from myharness.memory.indexing.vector import VectorIndex
     from myharness.memory.indexing.text import TextIndex
+    from myharness.memory.indexing.vector import VectorIndex
+    from myharness.memory.storage.derived import DerivedStorage
+    from myharness.memory.storage.source import SourceOfTruth
 
 logger = structlog.get_logger(__name__)
 

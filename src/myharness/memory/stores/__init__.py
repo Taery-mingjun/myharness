@@ -8,10 +8,10 @@
 
 from __future__ import annotations
 
-from myharness.memory.stores.identity import IdentityStore
 from myharness.memory.stores.episodic import EpisodicStore
-from myharness.memory.stores.semantic import SemanticStore
+from myharness.memory.stores.identity import IdentityStore
 from myharness.memory.stores.relationship import RelationshipStore
+from myharness.memory.stores.semantic import SemanticStore
 
 __all__ = [
     "IdentityStore",

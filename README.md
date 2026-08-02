@@ -16,7 +16,6 @@ MyHarness (MYH) 是一个认知操作系统，实现了LLM Agent的四权分离�
 
 ## 项目文档
 
-- 设计稿 v1.1：`myharness1.1(1).pdf`（桌面）
 - 工程计划：`docs/PROJECT_PLAN.md` · 进度追踪：`PROGRESS.md` · 代码审查：`docs/REVIEW_REPORT.md` · 开源调研：`docs/OPENSOURCE_SURVEY.md`
 
 ## 架构原则

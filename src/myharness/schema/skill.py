@@ -8,14 +8,13 @@ capability — only execution templates.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
 from myharness.core.types import SkillId
-
 
 # ── Skill Lifecycle States ─────────────────────────────────────────────
 
@@ -49,11 +48,11 @@ class SkillLifecycleTransition(BaseModel):
     from_status: SkillStatus
     to_status: SkillStatus
     reason: str = ""
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     triggered_by: str = "system"
 
     @model_validator(mode="after")
-    def _validate_transition(self) -> "SkillLifecycleTransition":
+    def _validate_transition(self) -> SkillLifecycleTransition:
         allowed = SKILL_LIFECYCLE_TRANSITIONS.get(self.from_status, set())
         if self.to_status not in allowed:
             raise ValueError(
@@ -147,8 +146,8 @@ class SkillDefinition(BaseModel):
     # Metadata
     author: str = Field(default="system")
     tags: list[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Provenance — where this skill came from
     compiled_from: list[str] = Field(

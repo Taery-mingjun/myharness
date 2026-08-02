@@ -9,10 +9,8 @@ The JSON file is the source of truth for each skill version.
 from __future__ import annotations
 
 import json
-import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import structlog
 
@@ -57,7 +55,7 @@ class SkillStorage:
         Raises:
             SkillError: If the file cannot be written.
         """
-        skill.updated_at = datetime.now(timezone.utc)
+        skill.updated_at = datetime.now(UTC)
         file_path = self._skill_path(skill.name, skill.version)
         file_path.parent.mkdir(parents=True, exist_ok=True)
 

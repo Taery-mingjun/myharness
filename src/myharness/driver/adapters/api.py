@@ -8,14 +8,15 @@ headers, and authentication.
 from __future__ import annotations
 
 import time
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import httpx
 import structlog
 
 from myharness.driver.protocol import UnifiedDriverProtocol
 from myharness.schema.capability import CapabilityAction, CapabilityDescriptor
-from myharness.schema.driver import ExecutionResult, ExecutionProgress
+from myharness.schema.driver import ExecutionProgress, ExecutionResult
 
 logger = structlog.get_logger(__name__)
 
@@ -149,9 +150,9 @@ class APIDriver(UnifiedDriverProtocol):
         start = time.monotonic()
         try:
             url = parameters.get("url", "")
-            params = parameters.get("params", None)
-            body = parameters.get("body", None)
-            extra_headers = parameters.get("headers", None)
+            params = parameters.get("params")
+            body = parameters.get("body")
+            extra_headers = parameters.get("headers")
 
             method = action.lower()
             response: httpx.Response

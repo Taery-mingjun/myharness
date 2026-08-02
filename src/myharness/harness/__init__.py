@@ -5,14 +5,14 @@ into a coherent cognitive pipeline. It is the "brain stem" that coordinates
 all subsystems.
 """
 
-from myharness.harness.supervisor import HarnessSupervisor
-from myharness.harness.registry import CapabilityRegistry
-from myharness.harness.scheduler import ResourceScheduler
-from myharness.harness.monitor import RuntimeMonitor
+from myharness.harness.compatibility import CompatibilityChecker
 from myharness.harness.guard import ExecutionGuard
+from myharness.harness.monitor import RuntimeMonitor
 from myharness.harness.permission import PermissionManager
 from myharness.harness.plugin import PluginManager
-from myharness.harness.compatibility import CompatibilityChecker
+from myharness.harness.registry import CapabilityRegistry
+from myharness.harness.scheduler import ResourceScheduler
+from myharness.harness.supervisor import HarnessSupervisor
 
 __all__ = [
     "HarnessSupervisor",

@@ -11,8 +11,8 @@ from typing import Any
 
 import structlog
 
-from myharness.schema.capability import CapabilityDescriptor
 from myharness.core.exceptions import CapabilityNotFoundError
+from myharness.schema.capability import CapabilityDescriptor
 
 logger = structlog.get_logger(__name__)
 

@@ -5,6 +5,6 @@ that is included in the main application.
 """
 
 # Re-exports for convenience
-from myharness.api.routers import cognitive, memory, skill, driver, harness, health
+from myharness.api.routers import cognitive, driver, harness, health, memory, skill
 
 __all__ = ["cognitive", "memory", "skill", "driver", "harness", "health"]

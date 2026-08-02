@@ -28,12 +28,13 @@ import structlog
 
 if TYPE_CHECKING:
     from lagom import Container
+
     from myharness.core.config import Settings
 
 logger = structlog.get_logger(__name__)
 
 
-def _build_embedder(settings: "Settings"):
+def _build_embedder(settings: Settings):
     """Construct the Embedder used by the Memory System.
 
     Per P8, the embedding backend is selected independently of the cognitive
@@ -79,7 +80,7 @@ def _build_embedder(settings: "Settings"):
     return Embedder(port=port, dimension=settings.embedding_dimension)
 
 
-def build_container(settings: "Settings") -> "Container":
+def build_container(settings: Settings) -> Container:
     """Build the complete dependency injection container.
 
     Every service is registered with an explicit ``lagom.Singleton`` wrapper.
@@ -109,10 +110,10 @@ def build_container(settings: "Settings") -> "Container":
     container[SettingsCls] = settings
 
     # ── Level 1: Storage (no dependencies) ─────────────────────────────
-    from myharness.memory.storage.source import SourceOfTruth
-    from myharness.memory.storage.derived import DerivedStorage
-    from myharness.memory.indexing.vector import VectorIndex
     from myharness.memory.indexing.text import TextIndex
+    from myharness.memory.indexing.vector import VectorIndex
+    from myharness.memory.storage.derived import DerivedStorage
+    from myharness.memory.storage.source import SourceOfTruth
 
     container[SourceOfTruth] = Singleton(
         lambda c: SourceOfTruth(
@@ -132,10 +133,10 @@ def build_container(settings: "Settings") -> "Container":
     ))
 
     # ── Level 2: Memory Stores (depend on storage) ─────────────────────
-    from myharness.memory.stores.identity import IdentityStore
     from myharness.memory.stores.episodic import EpisodicStore
-    from myharness.memory.stores.semantic import SemanticStore
+    from myharness.memory.stores.identity import IdentityStore
     from myharness.memory.stores.relationship import RelationshipStore
+    from myharness.memory.stores.semantic import SemanticStore
 
     container[IdentityStore] = Singleton(lambda c: IdentityStore(c[SourceOfTruth]))
     container[EpisodicStore] = Singleton(lambda c: EpisodicStore(
@@ -152,8 +153,8 @@ def build_container(settings: "Settings") -> "Container":
     container[Embedder] = Singleton(lambda c: _build_embedder(settings))
 
     # ── Level 3b: Memory Manager (depends on all stores + embedder) ────
-    from myharness.memory.manager import MemoryManager
     from myharness.memory.interface import MemorySystem
+    from myharness.memory.manager import MemoryManager
 
     container[MemoryManager] = Singleton(lambda c: MemoryManager(
         identity=c[IdentityStore],
@@ -166,8 +167,8 @@ def build_container(settings: "Settings") -> "Container":
     container[MemorySystem] = Singleton(lambda c: c[MemoryManager])
 
     # ── Level 4: LLM Provider (depends on config) ─────────────────────
-    from myharness.llm.providers import create_provider
     from myharness.llm.interfaces import LLMProvider
+    from myharness.llm.providers import create_provider
 
     container[LLMProvider] = Singleton(lambda c: create_provider(
         settings.default_llm_provider, settings
@@ -186,8 +187,8 @@ def build_container(settings: "Settings") -> "Container":
     ))
 
     # ── Level 7: Skill Store & Registry (depend on storage) ───────────
-    from myharness.skill.store import SkillStore
     from myharness.skill.registry import SkillRegistry
+    from myharness.skill.store import SkillStore
 
     container[SkillStore] = Singleton(lambda c: SkillStore(settings.skills_dir))
     container[SkillRegistry] = Singleton(lambda c: SkillRegistry(c[SkillStore]))
@@ -205,9 +206,9 @@ def build_container(settings: "Settings") -> "Container":
     container[DriverManager] = DriverManager()
 
     # ── Level 10: Harness Components (no dependencies) ────────────────
+    from myharness.harness.monitor import RuntimeMonitor
     from myharness.harness.registry import CapabilityRegistry
     from myharness.harness.scheduler import ResourceScheduler
-    from myharness.harness.monitor import RuntimeMonitor
 
     container[CapabilityRegistry] = Singleton(lambda c: CapabilityRegistry())
     container[ResourceScheduler] = Singleton(lambda c: ResourceScheduler())
