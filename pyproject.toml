@@ -46,6 +46,9 @@ dependencies = [
     "anthropic>=0.34.0",
     "google-generativeai>=0.8.0",
 
+    # Execution Driver: MCP (Model Context Protocol) client — protocol 14.4
+    "mcp>=2.0.0",
+
     # Dependency Injection
     "lagom>=2.0.0",
 
