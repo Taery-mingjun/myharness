@@ -1,0 +1,9 @@
+{
+  "task_id": "T4",
+  "name": "identity_read",
+  "description": "Read agent identity",
+  "input": {"endpoint": "GET /api/v1/memory/identity", "query": "{}"},
+  "expected": {"response_contains": ["name", "mission"]},
+  "pass_criteria": "Response contains 'name' and 'mission' fields",
+  "timeout_seconds": 10
+}

@@ -1,0 +1,9 @@
+{
+  "task_id": "T2",
+  "name": "greeting_chinese",
+  "description": "Greeting in Chinese",
+  "input": {"message": "你好"},
+  "expected": {"response_language": "zh", "response_type": "greeting"},
+  "pass_criteria": "Response is in Chinese and contains a greeting",
+  "timeout_seconds": 30
+}

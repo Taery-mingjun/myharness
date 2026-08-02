@@ -20,15 +20,27 @@ You have access to the following skills. Each skill has a name, description, inp
 {{ mission }}
 
 ## Instructions
-Given the goal below, create a structured execution plan using the available skills. 
+Given the goal below, create a structured execution plan using the available skills.
 
 1. Break the goal down into discrete, ordered steps.
 2. For each step, select the most appropriate skill (or use "reason" if no skill fits).
 3. Specify the exact parameters needed for each skill invocation.
 4. Include the expected outcome of each step.
 5. Provide a brief reasoning for the overall plan.
+6. **IMPORTANT**: If the goal is a conversational or informational request that does
+   NOT require executing any skill (e.g. "hello", "what is 1+1"), return an empty
+   steps array. Do NOT force a skill invocation for simple reasoning tasks.
 
-Return your plan as a JSON object with this exact structure:
+You MUST respond with ONLY a JSON object in this exact structure, no other text:
+```json
+{
+  "goal": "the original goal",
+  "reasoning": "brief explanation of the overall approach",
+  "steps": []
+}
+```
+
+If the goal requires skill execution, populate the steps array:
 ```json
 {
   "goal": "the original goal",

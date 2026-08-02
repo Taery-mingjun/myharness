@@ -1,0 +1,9 @@
+{
+  "task_id": "T5",
+  "name": "plan_simple",
+  "description": "Plan a simple task",
+  "input": {"message": "帮我规划明天上午的日程"},
+  "expected": {"response_type": "text", "response_not_empty": true},
+  "pass_criteria": "Response is non-empty text (plan may have 0+ steps)",
+  "timeout_seconds": 45
+}

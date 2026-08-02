@@ -350,13 +350,24 @@ class LLMEngine:
             return plan
 
         except (ValueError, KeyError) as exc:
-            logger.error("plan_parse_error", error=str(exc), response=response[:200])
-            raise ProviderError(
-                f"Failed to parse plan from LLM response: {exc}",
-                code="PLAN_PARSE_ERROR",
-                details={"goal": goal[:100]},
-                cause=exc,
-            ) from exc
+            logger.warning(
+                "plan_parse_fallback_empty_plan",
+                error=str(exc),
+                response_preview=response[:200],
+                goal=goal[:100],
+            )
+            # Graceful degradation: return an empty plan instead of raising.
+            # The cognitive pipeline continues with think() output as the
+            # response — the user still gets a meaningful reply even if
+            # the LLM didn't produce structured JSON.
+            return Plan(
+                plan_id=str(uuid.uuid4()),
+                goal=goal,
+                steps=[],
+                reasoning=f"LLM response was not parseable as JSON; falling back to empty plan. Response preview: {response[:200]}",
+                created_at=datetime.now(UTC),
+                current_step=0,
+            )
         except TokenLimitError:
             raise
         except ProviderError:
@@ -417,12 +428,22 @@ class LLMEngine:
             return reflection
 
         except (ValueError, KeyError) as exc:
-            logger.error("reflect_parse_error", error=str(exc), response=response[:200])
-            raise ProviderError(
-                f"Failed to parse reflection from LLM response: {exc}",
-                code="REFLECT_PARSE_ERROR",
-                cause=exc,
-            ) from exc
+            logger.warning(
+                "reflect_parse_fallback_default",
+                error=str(exc),
+                response_preview=response[:200],
+            )
+            # Graceful degradation: return a minimal reflection instead
+            # of raising. The cognitive pipeline continues and the user
+            # still gets the think() output as the response.
+            return Reflection(
+                reflection_id=str(uuid.uuid4()),
+                summary=f"Reflection parsing failed; raw LLM response: {response[:200]}",
+                lessons_learned=[],
+                skill_improvement_suggestions=[],
+                identity_implications=[],
+                emotional_tone="neutral",
+            )
         except TokenLimitError:
             raise
         except ProviderError:

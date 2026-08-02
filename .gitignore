@@ -44,3 +44,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Sandbox results (generated)
+sandbox/results/

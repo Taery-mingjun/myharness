@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  sandbox:
+    build:
+      context: ..
+      dockerfile: sandbox/Dockerfile
+    # Network isolation: no access to host network.
+    # Only LLM_API_EGRESS network allows outbound calls to LLM providers.
+    networks:
+      - llm_egress_only
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    # Read-only filesystem except /sandbox/results
+    read_only: true
+    tmpfs:
+      - /tmp:size=256M
+    volumes:
+      # Benchmark tasks are READ-ONLY — sandbox code cannot modify them
+      - ../sandbox/benchmark:/benchmark:ro
+      # Results are written here (writable)
+      - ../sandbox/results:/sandbox/results
+    environment:
+      - MYH_EMBEDDING_PROVIDER=none
+      - MYH_LOG_LEVEL=INFO
+      # LLM API key is passed at runtime, not baked into the image
+      - MYH_DEFAULT_LLM_PROVIDER=openai_compatible
+    # No privileged mode, no host PID/IPC
+    privileged: false
+    pid: "service:myharness_sandbox"
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  # Isolated network — no connection to host's default bridge
+  # Outbound internet access is allowed ONLY for LLM API calls
+  # (egress filtering is enforced at the network level in production;
+  #  for local dev this network provides isolation from host services)
+  llm_egress_only:
+    driver: bridge
+    internal: false

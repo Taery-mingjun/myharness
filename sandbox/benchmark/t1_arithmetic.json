@@ -1,0 +1,9 @@
+{
+  "task_id": "T1",
+  "name": "arithmetic",
+  "description": "Basic arithmetic question",
+  "input": {"message": "1+1等于几？只回答数字"},
+  "expected": {"response_contains": "2"},
+  "pass_criteria": "Response contains the digit '2'",
+  "timeout_seconds": 30
+}

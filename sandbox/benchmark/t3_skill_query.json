@@ -1,0 +1,9 @@
+{
+  "task_id": "T3",
+  "name": "skill_query",
+  "description": "List available skills",
+  "input": {"endpoint": "GET /api/v1/skill/", "query": "{}"},
+  "expected": {"response_contains": "skills", "response_type": "array"},
+  "pass_criteria": "Response is valid JSON with a 'skills' array field",
+  "timeout_seconds": 10
+}
