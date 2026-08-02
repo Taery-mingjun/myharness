@@ -7,7 +7,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
-from myharness.api.dependencies import get_supervisor
+from myharness.api.dependencies import get_supervisor, verify_api_key
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -35,6 +35,7 @@ async def get_harness_status(
 
 @router.post("/shutdown")
 async def shutdown_harness(
+    _: None = Depends(verify_api_key),
     supervisor=Depends(get_supervisor),
 ) -> dict[str, str]:
     """Initiate a graceful shutdown of the entire harness.

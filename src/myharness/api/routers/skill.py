@@ -8,7 +8,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from myharness.api.dependencies import get_skill_store
+from myharness.api.dependencies import get_skill_store, verify_api_key
 from myharness.schema.skill import SkillStatus
 
 logger = structlog.get_logger(__name__)
@@ -118,6 +118,7 @@ async def get_skill(
 @router.post("/", status_code=201)
 async def create_skill(
     req: SkillCreateRequest,
+    _: None = Depends(verify_api_key),
     skill_store=Depends(get_skill_store),
 ) -> dict[str, Any]:
     """Register a new skill definition."""
@@ -159,6 +160,7 @@ async def create_skill(
 async def update_skill(
     skill_id: str,
     update_data: dict[str, Any],
+    _: None = Depends(verify_api_key),
     skill_store=Depends(get_skill_store),
 ) -> dict[str, Any]:
     """Update an existing skill definition."""
@@ -181,6 +183,7 @@ async def update_skill(
 async def change_skill_status(
     skill_id: str,
     req: SkillStatusRequest,
+    _: None = Depends(verify_api_key),
     skill_store=Depends(get_skill_store),
 ) -> dict[str, Any]:
     """Change a skill's lifecycle status.

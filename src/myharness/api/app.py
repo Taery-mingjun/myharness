@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from myharness.api.middleware.error_handler import ErrorHandlerMiddleware
 from myharness.api.middleware.tracing import TracingMiddleware
+from myharness.core.config import get_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -83,13 +84,14 @@ def create_app(supervisor: Any = None) -> FastAPI:
         openapi_url="/openapi.json",
     )
 
-    # CORS — permissive for development, tighten for production
+    # CORS — explicit allowlist only (no wildcard), read from settings
+    settings = get_settings()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=settings.api_cors_origins,
+        allow_credentials=False,
+        allow_methods=settings.api_cors_methods,
+        allow_headers=settings.api_cors_headers,
     )
 
     # Custom middleware

@@ -74,9 +74,34 @@ class Settings(BaseSettings):
 
     # ── API Server ─────────────────────────────────────────────────────
 
-    api_host: str = Field(default="0.0.0.0", description="API server host")
+    api_host: str = Field(default="127.0.0.1", description="API server bind host")
     api_port: int = Field(default=8000, description="API server port")
     api_debug: bool = Field(default=False, description="Enable debug mode")
+
+    # API authentication — fail-closed if api_key is not configured
+    api_key: str = Field(
+        default="",
+        description="Static API key required for all mutating endpoints. "
+        "If empty, ALL write requests are rejected (fail-closed).",
+    )
+    api_key_header: str = Field(
+        default="X-API-Key",
+        description="HTTP header name from which the API key is read.",
+    )
+
+    # CORS — explicit allowlist (no wildcard)
+    api_cors_origins: list[str] = Field(
+        default_factory=lambda: ["http://127.0.0.1:8000", "http://localhost:8000"],
+        description="Explicit list of allowed CORS origins (no wildcard).",
+    )
+    api_cors_methods: list[str] = Field(
+        default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        description="Allowed HTTP methods for CORS.",
+    )
+    api_cors_headers: list[str] = Field(
+        default_factory=lambda: ["Authorization", "Content-Type", "X-API-Key"],
+        description="Allowed headers for CORS.",
+    )
 
     # ── Logging ────────────────────────────────────────────────────────
 

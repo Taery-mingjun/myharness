@@ -9,10 +9,16 @@ The container is cached via lru_cache so it's built once per process.
 
 from __future__ import annotations
 
+import hmac
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from fastapi import HTTPException, Header
+from structlog import get_logger
+
 from myharness.core.config import get_settings
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from lagom import Container
@@ -102,3 +108,53 @@ async def get_event_bus() -> "EventBus":
     from myharness.bus.dispatcher import EventBus
 
     return container.resolve(EventBus)
+
+
+async def verify_api_key(
+    api_key: str | None = Header(default=None, alias=get_settings().api_key_header),
+) -> None:
+    """Verify the API key from the request header using constant-time comparison.
+
+    Fail-closed: if no API key is configured server-side, ALL requests are
+    rejected with 401. This prevents accidental exposure of mutating
+    endpoints when the operator forgets to set MYH_API_KEY.
+
+    Args:
+        api_key: The value of the configured API key header (e.g. X-API-Key).
+
+    Raises:
+        HTTPException(401): If the key is missing, misconfigured, or invalid.
+    """
+    settings = get_settings()
+
+    # Fail-closed: no server-side key configured → reject everything
+    if not settings.api_key:
+        logger.warning("auth_rejected_no_server_key")
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required: server API key is not configured. "
+            "Set MYH_API_KEY to enable access.",
+            headers={"WWW-Authenticate": f"Bearer realm=\"myharness\", header=\"{settings.api_key_header}\""},
+        )
+
+    # Missing header
+    if api_key is None or api_key == "":
+        logger.warning("auth_rejected_missing_header", header=settings.api_key_header)
+        raise HTTPException(
+            status_code=401,
+            detail=f"Missing API key. Provide it via the '{settings.api_key_header}' header.",
+            headers={"WWW-Authenticate": f"Bearer realm=\"myharness\", header=\"{settings.api_key_header}\""},
+        )
+
+    # Constant-time comparison to mitigate timing attacks
+    expected = settings.api_key.encode("utf-8")
+    provided = api_key.encode("utf-8")
+    if not hmac.compare_digest(expected, provided):
+        logger.warning("auth_rejected_invalid_key")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid API key.",
+            headers={"WWW-Authenticate": f"Bearer realm=\"myharness\", header=\"{settings.api_key_header}\""},
+        )
+
+    logger.debug("auth_ok")

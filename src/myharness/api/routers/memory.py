@@ -8,7 +8,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from myharness.api.dependencies import get_memory
+from myharness.api.dependencies import get_memory, verify_api_key
 from myharness.schema.memory import MemoryQuery, MemorySearchResult
 
 logger = structlog.get_logger(__name__)
@@ -102,6 +102,7 @@ async def get_identity(memory=Depends(get_memory)) -> IdentityResponse:
 @router.put("/identity")
 async def update_identity(
     update: IdentityUpdateRequest,
+    _: None = Depends(verify_api_key),
     memory=Depends(get_memory),
 ) -> dict[str, Any]:
     """Update the agent's identity.
@@ -192,7 +193,10 @@ async def get_memory_stats(memory=Depends(get_memory)) -> MemoryStatsResponse:
 
 
 @router.post("/rebuild")
-async def rebuild_indexes(memory=Depends(get_memory)) -> dict[str, str]:
+async def rebuild_indexes(
+    _: None = Depends(verify_api_key),
+    memory=Depends(get_memory),
+) -> dict[str, str]:
     """Rebuild all derived indexes from source data.
 
     Per P9: All derived data (SQLite, FAISS, FTS5) can be fully
