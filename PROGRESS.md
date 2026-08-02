@@ -3,7 +3,7 @@
 > 更新规则：每阶段完成或重要决策时更新本文件，并提交推送 gitee（commit 信息含阶段号）。
 > 记录格式：`[日期] 阶段号 — 事项 — 依据（设计稿章节）— 结论`
 
-## 当前阶段：S0 基线 ✅ / S1 审查 🔄
+## 当前阶段：S0–S5 完成 ✅ / S6 查缺补漏 ✅（2026-08-02）
 
 | 阶段 | 状态 | 完成日期 | 备注 |
 |---|---|---|---|
@@ -24,3 +24,6 @@
 - **2026-08-02 S2** — 开源调研定稿（docs/OPENSOURCE_SURVEY.md）：直接采用 4 件（LiteLLM 可选、MCP SDK、faiss-cpu 保持、技能注册表模式参照），必须自研 5 件（记忆层、Event Bus、Skill Store、Harness、Provider 协议）；OpenClaw 缺陷验证用户直觉（技能=提示词、记忆弱、单线程）
 - **2026-08-02 S3** — 差距决策：**无需重建**；MCP 驱动现为 stub，S4 采用官方 SDK 实现；LiteLLM 因 PyPI 投毒事件只作可选扩展；Event Schema 协议文档优先于代码改动。路线图定稿见 PROJECT_PLAN.md §4
 - **2026-08-02 S4** — 四项全部落地并推送：① 协议文档五份（docs/protocol/01–05，`da41959`）② Event Schema 规范化（priority 字段 + 27 种事件强类型载荷，向后兼容，`8277104`）③ MCP 驱动真实实现（官方 SDK 2.0，stdio + HTTP 传输，10 个集成测试，`c882245`）④ skill 测试补强至 98–100%（`19545bd`）。全量 349 测试通过、覆盖 70%
+- **2026-08-02 S5** — v0.2.0 发布（tag 推送 gitee），349 测试全过
+- **2026-08-02 用户改动** — gitee 新增 4 提交（`19ce21f` 发布清理 / `e4ffe33` 修复×4 / `f3210b5` 降级+self-healing+sandbox / `08ea338` Reflex 层），379 测试通过；GitHub 双仓同步
+- **2026-08-02 S6 查缺补漏** — 审查修复 3 个 P0 + 3 个 P1：① `rollback_to_stable()` 缺失（自愈确认不可用）→ 实现版本指针机制；② Reflex/自愈未接入运行时（死代码）→ DI 装配 + boot rebuild + 指标采集；③ Reflex 命中不执行 skill → 接入 driver 执行 + 失败降级；④ 跨类私有访问 → 公共 API；⑤ CJK 关键词 bigram 提取；⑥ current_version 占位符。新增 12 测试，全量 391 通过、覆盖 71%。详见 docs/REVIEW_REPORT_2.md

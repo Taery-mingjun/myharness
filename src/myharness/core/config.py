@@ -102,6 +102,18 @@ class Settings(BaseSettings):
         default="IVFFlat", description="FAISS index type (IVFFlat, Flat, HNSW, etc.)"
     )
 
+    # ── Self-healing & Reflex Layer ────────────────────────────────────
+
+    healing_failure_threshold: int = Field(
+        default=5, ge=1, description="Consecutive failures that generate a rollback candidate"
+    )
+    healing_window_size: int = Field(
+        default=100, ge=10, description="Metric window used for failure-rate evaluation"
+    )
+    reflex_success_threshold: int = Field(
+        default=5, ge=1, description="Consecutive successes required to promote a skill to the Reflex Index"
+    )
+
     # ── API Server ─────────────────────────────────────────────────────
 
     api_host: str = Field(default="127.0.0.1", description="API server bind host")

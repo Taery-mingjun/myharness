@@ -206,6 +206,31 @@ class DriftDetector:
             MetricType.ANOMALY_RESPONSE, source, 1.0, metadata
         )
 
+    async def get_consecutive_successes(self, skill_name: str) -> int:
+        """Number of consecutive successful executions of a skill.
+
+        Public API used by the Reflex Layer (harness/reflex.py) to decide
+        promotion eligibility. Successes are counted from the most recent
+        metric backwards; the run ends at the first failure.
+        """
+        conn = await self._get_conn()
+        cursor = await conn.execute(
+            "SELECT metric_type FROM drift_metrics "
+            "WHERE skill_name = ? AND metric_type IN ('skill_success', 'skill_failure') "
+            "ORDER BY timestamp DESC LIMIT 50",
+            (skill_name,),
+        )
+        rows = await cursor.fetchall()
+        cursor.close()
+
+        consecutive = 0
+        for row in rows:
+            if row["metric_type"] == MetricType.SKILL_SUCCESS.value:
+                consecutive += 1
+            else:
+                break
+        return consecutive
+
     async def _check_consecutive_failures(self, skill_name: str) -> None:
         """Check if consecutive failures exceed the threshold."""
         conn = await self._get_conn()
@@ -239,8 +264,18 @@ class DriftDetector:
         reason: RollbackReason,
         detail: str,
         target_version: str | None = None,
+        current_version: str = "unknown",
     ) -> str:
-        """Generate a rollback candidate and queue it for confirmation."""
+        """Generate a rollback candidate and queue it for confirmation.
+
+        Args:
+            skill_name: The skill to roll back.
+            reason: Why the candidate was generated.
+            detail: Human-readable details.
+            target_version: Version to roll back to (None = newest STABLE).
+            current_version: The version currently active. Callers with a
+                SkillStore should pass the real version.
+        """
         candidate_id = str(uuid.uuid4())
         conn = await self._get_conn()
         await conn.execute(
@@ -251,7 +286,7 @@ class DriftDetector:
             (
                 candidate_id,
                 skill_name,
-                "current",  # In a real system, this would be the actual version
+                current_version,
                 target_version,
                 reason.value,
                 detail,
@@ -377,6 +412,21 @@ class RollbackManager:
         skill_name = row["skill_name"]
         target_version = row["target_version"]
 
+        # Resolve the real current version when the candidate only holds a
+        # placeholder (generated without a SkillStore reference).
+        current_version = row["current_version"]
+        if current_version in ("unknown", "current") and self._skill_store is not None:
+            try:
+                current_skill = await self._skill_store.get_by_name(skill_name)
+                if current_skill is not None:
+                    current_version = current_skill.version
+            except Exception:
+                logger.warning(
+                    "current_version_resolve_failed",
+                    skill_name=skill_name,
+                    exc_info=True,
+                )
+
         # If a SkillStore is connected, perform the actual rollback
         skill_rolled_back = False
         if self._skill_store is not None:
@@ -416,6 +466,7 @@ class RollbackManager:
             "status": "confirmed",
             "candidate_id": candidate_id,
             "skill_name": skill_name,
+            "current_version": current_version,
             "target_version": target_version,
             "skill_rolled_back": skill_rolled_back,
             "confirmed_by": confirmed_by,

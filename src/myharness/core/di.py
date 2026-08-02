@@ -230,6 +230,24 @@ def build_container(settings: Settings) -> Container:
         enforce=settings.enforce_execution_boundary,
     ))
 
+    # ── Level 10b: Self-healing & Reflex Layer ─────────────────────────
+    # DriftDetector persists execution metrics (SQLite) and generates
+    # rollback candidates; ReflexIndex promotes Stable skills to low-latency
+    # triggering. Both feed the supervisor (Level 12).
+    from myharness.harness.healing import DriftDetector
+    from myharness.harness.reflex import ReflexIndex
+
+    container[DriftDetector] = Singleton(lambda c: DriftDetector(
+        db_path=settings.data_dir / "healing" / "drift.db",
+        failure_threshold=settings.healing_failure_threshold,
+        window_size=settings.healing_window_size,
+    ))
+    container[ReflexIndex] = Singleton(lambda c: ReflexIndex(
+        skill_store=c[SkillStore],
+        drift_detector=c[DriftDetector],
+        success_threshold=settings.reflex_success_threshold,
+    ))
+
     # ── Level 11: Runtime Layer (event loop, state, interrupts) ───────
     from myharness.runtime.interrupt import InterruptHandler
     from myharness.runtime.loop import EventLoop
@@ -262,6 +280,8 @@ def build_container(settings: Settings) -> Container:
         monitor=c[RuntimeMonitor],
         cognitive_loop=c[EventLoop],
         execution_guard=c[ExecutionGuard],
+        reflex_index=c[ReflexIndex],
+        drift_detector=c[DriftDetector],
     ))
 
     logger.info(

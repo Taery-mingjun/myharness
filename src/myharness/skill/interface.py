@@ -188,3 +188,20 @@ class SkillStoreInterface(ABC):
             A dictionary with keys like total_skills, by_status, by_driver_type, etc.
         """
         ...
+
+    @abstractmethod
+    async def rollback_to_stable(
+        self,
+        skill_name: str,
+        target_version: str | None = None,
+    ) -> bool:
+        """Roll a skill back to a previous stable version (self-healing).
+
+        Args:
+            skill_name: The skill name to roll back.
+            target_version: Explicit version, or None for newest STABLE.
+
+        Returns:
+            True if the rollback pointer was moved.
+        """
+        ...

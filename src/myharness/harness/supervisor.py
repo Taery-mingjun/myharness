@@ -51,6 +51,7 @@ class HarnessSupervisor:
         cognitive_loop: Any = None,
         execution_guard: Any = None,
         reflex_index: Any = None,
+        drift_detector: Any = None,
     ) -> None:
         """Initialize the harness supervisor.
 
@@ -95,6 +96,11 @@ class HarnessSupervisor:
         # before entering the full think→plan→reflect pipeline.
         self._reflex_index = reflex_index
 
+        # Self-healing (§7.2 / healing.py): records skill execution outcomes.
+        # When non-None, every executed skill is recorded so DriftDetector can
+        # generate rollback candidates on consecutive failures.
+        self._drift_detector = drift_detector
+
         self._boot_time: float = 0.0
         self._is_running = False
         self._has_shut_down = False
@@ -137,6 +143,19 @@ class HarnessSupervisor:
         # Start the cognitive loop (P4: one loop, no mode switching)
         if self._cognitive_loop is not None:
             await self._cognitive_loop.start()
+
+        # Rebuild the Reflex Index from Stable skills (P9: derived data,
+        # fully rebuildable at boot — the index itself is never persisted).
+        if self._reflex_index is not None:
+            try:
+                rebuild = await self._reflex_index.rebuild()
+                logger.info(
+                    "reflex_index_rebuilt_at_boot",
+                    promoted=rebuild.get("promoted", 0),
+                    rejected=rebuild.get("rejected_by_threshold", 0),
+                )
+            except Exception:
+                logger.exception("reflex_rebuild_failed_at_boot")
 
         self._is_running = True
 
@@ -310,27 +329,76 @@ class HarnessSupervisor:
                         except Exception:
                             params = {}
 
+                        if not isinstance(params, dict):
+                            params = {}
+
+                        # Execute the skill through the driver layer.
+                        # The templated action is the skill's default; the
+                        # LLM-extracted params override template defaults.
+                        action = (skill.action_template or {}).get("action", skill.name)
+                        try:
+                            result = await self._driver_manager.execute(
+                                driver_name=skill.driver_type,
+                                action=action,
+                                parameters=params,
+                            )
+                            success = bool(getattr(result, "success", False))
+                            output = getattr(result, "output", None)
+                        except Exception as exc:
+                            success = False
+                            output = None
+                            logger.error(
+                                "reflex_execution_error",
+                                skill_name=skill.name,
+                                error=str(exc),
+                            )
+
                         reflex_ms = (time.monotonic() - reflex_start) * 1000
                         logger.info(
                             "reflex_executed",
                             skill_name=skill.name,
                             duration_ms=round(reflex_ms, 2),
                             params=params,
+                            success=success,
                         )
+
+                        # Record the execution for self-healing metrics
+                        if self._drift_detector is not None:
+                            try:
+                                await self._drift_detector.record_skill_execution(
+                                    skill.name, success
+                                )
+                            except Exception:
+                                logger.warning(
+                                    "drift_record_failed", skill_name=skill.name
+                                )
 
                         # Record the reflex execution as an episode
                         await self._memory.record_episode(
                             EpisodicEntry(
                                 summary=f"Reflex: {skill.name} triggered",
                                 category="interaction",
-                                detail=f"User: {message}\nReflex skill: {skill.name}\nParams: {params}",
+                                detail=(
+                                    f"User: {message}\nReflex skill: {skill.name}\n"
+                                    f"Params: {params}\nResult: {output}\nSuccess: {success}"
+                                ),
                                 participants=[user_id],
                                 tags=["reflex", skill.name],
                                 importance=0.5,
                             )
                         )
 
-                        return f"[reflex:{skill.name}] Executed with params: {params}"
+                        if success:
+                            return f"[reflex:{skill.name}] 执行成功: {output}"
+
+                        # Reflex execution failed — degrade gracefully to the
+                        # full cognitive pipeline instead of returning an
+                        # error (design requirement: reflex is an
+                        # optimization, never a failure point).
+                        logger.warning(
+                            "reflex_failed_falling_back",
+                            skill_name=skill.name,
+                        )
 
             # Stage 1: Record the user message as an episodic entry
             await self._memory.record_episode(
@@ -514,17 +582,19 @@ class HarnessSupervisor:
                 continue
 
             # Execute via driver
+            success = False
             try:
                 result = await self._driver_manager.execute(
                     driver_name=skill.driver_type,
                     action=action,
                     parameters=parameters,
                 )
+                success = bool(getattr(result, "success", False))
                 logger.info(
                     "step_executed",
                     skill_name=skill_name,
                     action=action,
-                    success=getattr(result, "success", False),
+                    success=success,
                 )
             except Exception as exc:
                 logger.error(
@@ -533,6 +603,17 @@ class HarnessSupervisor:
                     action=action,
                     error=str(exc),
                 )
+
+            # Record the outcome for self-healing metrics
+            if self._drift_detector is not None:
+                try:
+                    await self._drift_detector.record_skill_execution(
+                        skill_name, success
+                    )
+                except Exception:
+                    logger.warning(
+                        "drift_record_failed", skill_name=skill_name
+                    )
 
             if hasattr(plan, "current_step"):
                 plan.current_step = index + 1

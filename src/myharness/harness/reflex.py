@@ -313,6 +313,8 @@ class ReflexIndex:
             "rejected_by_threshold": rejected,
         }
 
+    _CJK_RE = re.compile(r"[一-鿿]+")
+
     def _extract_triggers(
         self, skill: SkillDefinition
     ) -> tuple[list[str], list[re.Pattern[str]]]:
@@ -327,17 +329,18 @@ class ReflexIndex:
         if skill.name:
             keywords.append(skill.name.lower())
 
-        # Description words — for CJK text, individual characters are
-        # meaningful triggers, so we keep words with len >= 2 for CJK
-        # and len > 3 for ASCII (to avoid noise like "the", "a", etc.)
+        # Description words — CJK runs are segmented into 2-char bigrams
+        # (Chinese has no word separators, so a whitespace split would
+        # produce one unusable whole-phrase keyword); ASCII words must be
+        # long enough to be meaningful.
         if skill.description:
             for word in skill.description.split():
                 word = word.strip(".,!?;:\"'")
-                # Check if word contains CJK characters
-                has_cjk = any('\u4e00' <= ch <= '\u9fff' for ch in word)
-                if has_cjk and len(word) >= 2:
-                    keywords.append(word.lower())
-                elif not has_cjk and len(word) > 3:
+                cjk_runs = self._CJK_RE.findall(word)
+                if cjk_runs:
+                    for run in cjk_runs:
+                        keywords.extend(self._cjk_bigrams(run))
+                elif len(word) > 3:
                     keywords.append(word.lower())
 
         # Tags as keywords too
@@ -354,28 +357,21 @@ class ReflexIndex:
 
         return keywords, regex_patterns
 
+
+    @staticmethod
+    def _cjk_bigrams(run: str, limit: int = 16) -> list[str]:
+        """Segment a CJK run into 2-character bigrams (bounded).
+
+        Bigrams keep trigger precision high without a Chinese word
+        segmentation dependency: "打开冰箱" -> ["打开", "开冰", "冰箱"].
+        """
+        lowered = run.lower()
+        return [lowered[i : i + 2] for i in range(len(lowered) - 1)][:limit]
     async def _get_consecutive_successes(self, skill_name: str) -> int:
-        """Read consecutive success count from DriftDetector."""
+        """Read consecutive success count from DriftDetector (public API)."""
         if self._drift_detector is None:
             return 0
-
-        conn = await self._drift_detector._get_conn()
-        cursor = await conn.execute(
-            "SELECT metric_type FROM drift_metrics "
-            "WHERE skill_name = ? AND metric_type IN ('skill_success', 'skill_failure') "
-            "ORDER BY timestamp DESC LIMIT 50",
-            (skill_name,),
-        )
-        rows = await cursor.fetchall()
-        cursor.close()
-
-        consecutive = 0
-        for row in rows:
-            if row["metric_type"] == "skill_success":
-                consecutive += 1
-            else:
-                break
-        return consecutive
+        return await self._drift_detector.get_consecutive_successes(skill_name)
 
     @property
     def trigger_count(self) -> int:

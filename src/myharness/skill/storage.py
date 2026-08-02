@@ -25,7 +25,13 @@ class SkillStorage:
 
     Handles reading and writing individual skill JSON files. Does not
     implement business logic — that belongs in SkillStore.
+
+    Each skill directory may also hold a ``current.json`` pointer file
+    recording which version is currently active (used by rollbacks).
+    Pointer files are excluded from version listing and full scans.
     """
+
+    _CURRENT_FILE = "current.json"
 
     def __init__(self, skills_dir: Path) -> None:
         """Initialize the skill storage layer.
@@ -99,6 +105,8 @@ class SkillStorage:
             if not skill_dir.is_dir():
                 continue
             for json_file in skill_dir.glob("*.json"):
+                if json_file.name == self._CURRENT_FILE:
+                    continue
                 try:
                     data = json.loads(json_file.read_text(encoding="utf-8"))
                     if data.get("skill_id") == skill_id:
@@ -108,6 +116,41 @@ class SkillStorage:
                         "corrupt_skill_file", path=str(json_file)
                     )
         return None
+
+    # ── Current-version pointer (rollback support) ─────────────────────
+
+    async def save_current(self, name: str, version: str) -> None:
+        """Record ``version`` as the currently active version of ``name``.
+
+        The pointer file is derived data: it can always be reconstructed
+        as the newest registered version, so its loss is not data loss.
+        """
+        safe_name = name.replace("/", "_").replace("\\", "_")
+        pointer_dir = self._skills_dir / safe_name
+        pointer_dir.mkdir(parents=True, exist_ok=True)
+        pointer = pointer_dir / self._CURRENT_FILE
+        pointer.write_text(
+            json.dumps({"name": name, "version": version}),
+            encoding="utf-8",
+        )
+        logger.debug(
+            "skill_current_pointer_set",
+            name=name,
+            version=version,
+        )
+
+    async def load_current(self, name: str) -> str | None:
+        """Load the active version pointer for ``name``, or None."""
+        pointer = self._skill_dir(name) / self._CURRENT_FILE
+        if not pointer.exists():
+            return None
+        try:
+            data = json.loads(pointer.read_text(encoding="utf-8"))
+            version = data.get("version")
+            return str(version) if version else None
+        except (json.JSONDecodeError, KeyError, ValueError):
+            logger.warning("corrupt_current_pointer", name=name, path=str(pointer))
+            return None
 
     async def load_by_name_version(
         self, name: str, version: str
@@ -151,6 +194,8 @@ class SkillStorage:
 
         versions: list[str] = []
         for json_file in sorted(skill_dir.glob("*.json")):
+            if json_file.name == self._CURRENT_FILE:
+                continue
             stem = json_file.stem
             if stem not in versions:
                 versions.append(stem)
@@ -171,6 +216,8 @@ class SkillStorage:
             if not skill_dir.is_dir():
                 continue
             for json_file in sorted(skill_dir.glob("*.json")):
+                if json_file.name == self._CURRENT_FILE:
+                    continue
                 try:
                     data = json.loads(json_file.read_text(encoding="utf-8"))
                     skills.append(SkillDefinition(**data))
@@ -210,7 +257,11 @@ class SkillStorage:
                 version=skill.version,
             )
 
-        # Clean up empty directories
+        # Clean up the current-version pointer, then empty directories
+        pointer = self._skill_dir(skill.name) / self._CURRENT_FILE
+        if pointer.exists():
+            pointer.unlink()
+
         skill_dir = self._skill_dir(skill.name)
         if skill_dir.exists() and not any(skill_dir.iterdir()):
             skill_dir.rmdir()

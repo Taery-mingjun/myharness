@@ -84,6 +84,8 @@ class SkillStore(SkillStoreInterface):
             )
 
         await self._storage.save(skill)
+        # Newly registered version becomes the active one (rollback pointer).
+        await self._storage.save_current(skill.name, skill.version)
         logger.info(
             "skill_registered",
             skill_id=str(skill.skill_id),
@@ -119,6 +121,14 @@ class SkillStore(SkillStoreInterface):
         """
         if version is not None:
             return await self._storage.load_by_name_version(name, version)
+
+        # Prefer the current-version pointer (rollback-aware), falling back
+        # to the newest registered version when no pointer exists.
+        current = await self._storage.load_current(name)
+        if current is not None:
+            skill = await self._storage.load_by_name_version(name, current)
+            if skill is not None:
+                return skill
 
         # Get latest version
         versions = await self._storage.list_versions(name)
@@ -360,3 +370,61 @@ class SkillStore(SkillStoreInterface):
                 total_confidence / len(all_skills) if all_skills else 0.0
             ),
         }
+
+    async def rollback_to_stable(
+        self,
+        skill_name: str,
+        target_version: str | None = None,
+    ) -> bool:
+        """Roll a skill back to a previous stable version (self-healing).
+
+        Points the current-version pointer at the target version so that
+        ``get_by_name(name)`` resolves there. When ``target_version`` is
+        None, the newest version whose status is STABLE is chosen.
+
+        Args:
+            skill_name: The skill name to roll back.
+            target_version: Explicit version to roll back to. When None,
+                the newest STABLE-status version is used.
+
+        Returns:
+            True if the pointer was moved, False if no suitable version
+            exists (nothing to roll back to).
+        """
+        if target_version is not None:
+            skill = await self._storage.load_by_name_version(
+                skill_name, target_version
+            )
+            if skill is None:
+                logger.warning(
+                    "rollback_target_missing",
+                    skill_name=skill_name,
+                    target_version=target_version,
+                )
+                return False
+            await self._storage.save_current(skill_name, target_version)
+            logger.info(
+                "skill_rolled_back",
+                skill_name=skill_name,
+                target_version=target_version,
+            )
+            return True
+
+        # No explicit target: newest version in STABLE status.
+        versions = await self._storage.list_versions(skill_name)
+        for version in versions:
+            skill = await self._storage.load_by_name_version(skill_name, version)
+            if skill is not None and skill.status == SkillStatus.STABLE:
+                await self._storage.save_current(skill_name, version)
+                logger.info(
+                    "skill_rolled_back",
+                    skill_name=skill_name,
+                    target_version=version,
+                )
+                return True
+
+        logger.warning(
+            "no_stable_version_for_rollback",
+            skill_name=skill_name,
+        )
+        return False
