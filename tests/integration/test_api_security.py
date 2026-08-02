@@ -47,32 +47,6 @@ PUBLIC_ROUTES = [
 ]
 
 
-@pytest.fixture
-def api_client(tmp_path, monkeypatch):
-    """A TestClient backed by an isolated, offline MyHarness instance."""
-    monkeypatch.setenv("MYH_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("MYH_API_KEY", API_KEY)
-    monkeypatch.setenv("MYH_OPENAI_API_KEY", "sk-test-not-used")
-    monkeypatch.setenv("MYH_EMBEDDING_PROVIDER", "none")
-    monkeypatch.setenv("MYH_LOG_LEVEL", "ERROR")
-
-    # Both caches are process-global; clear them so this app does not inherit
-    # (or leak) another test's settings and container.
-    from myharness.api.dependencies import get_container
-    from myharness.core.config import get_settings
-
-    get_settings.cache_clear()
-    get_container.cache_clear()
-
-    from myharness.api.app import create_app
-
-    with TestClient(create_app()) as client:
-        yield client
-
-    get_settings.cache_clear()
-    get_container.cache_clear()
-
-
 def _call(client, method: str, path: str, **kwargs):
     return client.request(method, path, **kwargs)
 

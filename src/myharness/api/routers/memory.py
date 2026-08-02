@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from myharness.api.dependencies import get_memory
+from myharness.core.exceptions import IdentityConflictError
 from myharness.schema.memory import MemoryQuery, MemorySearchResult
 
 logger = structlog.get_logger(__name__)
@@ -34,13 +35,26 @@ class IdentityResponse(BaseModel):
 
 
 class IdentityUpdateRequest(BaseModel):
-    """Request to update the agent's identity."""
+    """Request to update the agent's identity.
+
+    Only the fields present in the request body are changed; everything
+    else is carried over from the current identity.
+    """
 
     core_values: list[str] | None = None
     mission: str | None = None
     preferences: dict[str, Any] | None = None
     self_description: str | None = None
     behavioral_guidelines: list[str] | None = None
+    expected_version: int | None = Field(
+        default=None,
+        description=(
+            "Version the caller believes is current. When supplied, the "
+            "update is rejected with 409 if the identity changed in the "
+            "meantime — the equivalent of an If-Match header. Omit it to "
+            "apply the change to whatever version is current."
+        ),
+    )
 
 
 class SearchRequest(BaseModel):
@@ -118,18 +132,39 @@ async def update_identity(
 ) -> dict[str, Any]:
     """Update the agent's identity.
 
-    Accepts partial updates — only provided fields are modified.
-    The version number increments automatically on each update.
+    Accepts partial updates — only provided fields are modified. The
+    version number increments automatically on each update.
+
+    This endpoint used to reject every request it received. It set
+    ``version = current.version + 1`` before handing the entry to the
+    store, but the store treats the incoming version as the caller's
+    view of *current* state and does the increment itself — so the
+    optimistic-concurrency check always saw N+1 where it expected N and
+    answered "Version conflict: expected 1, got 2". The agent's identity
+    was effectively read-only over HTTP.
+
+    Pass ``expected_version`` to opt into a real conflict check.
     """
     current = await memory.get_identity()
 
-    # Apply partial updates
     from myharness.schema.memory import IdentityEntry
 
-    updated_data = current.model_dump()
     update_dict = update.model_dump(exclude_unset=True)
+    expected = update_dict.pop("expected_version", None)
+
+    if expected is not None and expected != current.version:
+        raise IdentityConflictError(
+            f"Version conflict: expected {current.version}, got {expected}",
+            details={
+                "expected_version": current.version,
+                "provided_version": expected,
+            },
+        )
+
+    updated_data = current.model_dump()
     updated_data.update(update_dict)
-    updated_data["version"] = current.version + 1
+    # The store owns the increment; hand it the version we actually read.
+    updated_data["version"] = current.version
 
     entry = IdentityEntry(**updated_data)
     await memory.update_identity(entry)
