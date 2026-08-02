@@ -244,3 +244,66 @@ class TestHealthProbesReflectRealState:
 
         # Liveness stays green: the process itself is still viable.
         assert api_client.get("/health").status_code == 200
+
+
+class TestLivenessSurvivesMisconfiguration:
+    """A liveness probe must not fail for reasons a restart cannot fix.
+
+    Found by smoke-testing a real server with no LLM key set. In the API's
+    lazy mode, resolving the supervisor builds the entire DI graph, so
+    constructing the LLM engine raised ProviderNotAvailableError straight
+    out of ``/health``. Kubernetes reads that as "wedged process", kills
+    the pod, and restarts it — forever, because no restart supplies a
+    missing API key. Readiness is where that condition belongs.
+    """
+
+    @staticmethod
+    def _break_supervisor(monkeypatch):
+        from myharness.api.routers import health
+        from myharness.core.exceptions import ProviderNotAvailableError
+
+        async def boom():
+            raise ProviderNotAvailableError(
+                "OpenAI API key is not configured.",
+                code="OPENAI_NOT_CONFIGURED",
+            )
+
+        monkeypatch.setattr(health, "get_supervisor", boom)
+
+    async def test_liveness_stays_green_when_the_graph_cannot_be_built(
+        self, api_client, monkeypatch
+    ):
+        self._break_supervisor(monkeypatch)
+
+        response = api_client.get("/health")
+
+        assert response.status_code == 200, (
+            "a misconfigured instance was reported dead — the orchestrator "
+            "would restart-loop it without ever fixing the configuration"
+        )
+        body = response.json()
+        assert body["status"] == "healthy"
+        assert "not constructible" in body["detail"]
+
+    async def test_readiness_drains_the_instance_instead(
+        self, api_client, monkeypatch
+    ):
+        self._break_supervisor(monkeypatch)
+
+        response = api_client.get("/health/ready")
+
+        assert response.status_code == 503
+        assert response.json()["status"] == "not_ready"
+        assert "OPENAI_NOT_CONFIGURED" in response.json()["detail"]
+
+    async def test_probes_never_return_500(self, api_client, monkeypatch):
+        """A probe that 500s tells the orchestrator nothing useful."""
+        from myharness.api.routers import health
+
+        async def boom():
+            raise RuntimeError("something entirely unexpected")
+
+        monkeypatch.setattr(health, "get_supervisor", boom)
+
+        assert api_client.get("/health").status_code == 200
+        assert api_client.get("/health/ready").status_code == 503
