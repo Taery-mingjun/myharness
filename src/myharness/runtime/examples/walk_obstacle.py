@@ -1,60 +1,101 @@
-"""Demonstrates: Walk → Obstacle → Interrupt → LLM Replan → Skill Reparameterize → Continue.
+"""Demonstrates: Walk → Obstacle → Interrupt → LLM Replan → Resume.
 
-This example shows how the runtime handles unexpected obstacles during
-plan execution. When a "walk" skill encounters an obstacle, the interrupt
-handler pauses execution, engages the LLM to create a new plan, and
-resumes from the appropriate step.
+This runs the real interrupt pipeline. The previous version of this module
+was theatre: it accepted a ``supervisor`` it never used, hardcoded the
+"replanned" plan as a literal, and slept for 100ms under a
+``thinking_about_obstacle`` log line. It printed a flawless success report
+whether or not the interrupt subsystem worked at all — which it did not.
+
+A demo that cannot fail proves nothing, so this one calls the actual
+``InterruptHandler``, asks the actual LLM engine to replan, and executes the
+resulting steps through the actual driver stack. If any of that is broken,
+the demo raises.
 """
 
 from __future__ import annotations
 
-import asyncio
 import time
+import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
 
+from myharness.llm.engine import Plan, PlanStep
+
 logger = structlog.get_logger(__name__)
 
 
-async def demo_walk_obstacle(supervisor: Any) -> None:
-    """Run the walk-obstacle demo showing interrupt-based replanning.
+def _walk_plan() -> Plan:
+    """The plan the robot is executing when it hits the wall."""
+    return Plan(
+        plan_id=f"walk-demo-{uuid.uuid4().hex[:6]}",
+        goal="Walk to the destination at (10, 5)",
+        steps=[
+            PlanStep(
+                step_id="s1",
+                action="move_forward",
+                skill_name="walk",
+                parameters={"distance_m": 10, "speed": "normal"},
+                expected_outcome="advanced 10 metres",
+            ),
+            PlanStep(
+                step_id="s2",
+                action="turn",
+                skill_name="walk",
+                parameters={"angle_deg": 90},
+                expected_outcome="facing the destination",
+            ),
+            PlanStep(
+                step_id="s3",
+                action="move_forward",
+                skill_name="walk",
+                parameters={"distance_m": 5, "speed": "normal"},
+                expected_outcome="arrived at the destination",
+            ),
+        ],
+        reasoning="Direct route to the destination",
+        created_at=datetime.now(timezone.utc),
+        current_step=1,  # s1 already done; interrupted partway through s2
+    )
 
-    This demo simulates:
-    1. A robot with a "walk" skill that encounters an obstacle.
-    2. The interrupt handler pausing execution.
-    3. The LLM replanning around the obstacle.
-    4. A new "navigate_around" skill being parameterized.
-    5. Execution resuming with the updated plan.
+
+async def demo_walk_obstacle(
+    supervisor: Any = None,
+    interrupt_handler: Any = None,
+) -> Plan:
+    """Run the walk-obstacle demo against the real interrupt pipeline.
+
+    Sequence:
+    1. A robot is midway through a walking plan.
+    2. The front lidar reports an obstacle — the plan is interrupted.
+    3. The interrupt handler thinks, then asks the LLM to replan using the
+       skills actually present in the registry.
+    4. The revised plan is resumed and executed through the drivers.
 
     Args:
-        supervisor: The HarnessSupervisor instance.
+        supervisor: A booted ``HarnessSupervisor``. Used to source the
+            interrupt handler and to execute the revised plan. Optional if
+            ``interrupt_handler`` is supplied.
+        interrupt_handler: An ``InterruptHandler`` to use directly.
+
+    Returns:
+        The revised ``Plan`` produced by the replan.
+
+    Raises:
+        ValueError: If no interrupt handler can be resolved. The demo will
+            not fake a result.
     """
-    logger.info("walk_obstacle_demo_starting")
+    handler = interrupt_handler or _resolve_handler(supervisor)
+    if handler is None:
+        raise ValueError(
+            "demo_walk_obstacle needs an InterruptHandler. Pass one, or pass "
+            "a supervisor built by build_container() so it can be resolved."
+        )
 
-    # Simulated plan: walk to a destination
-    plan = {
-        "plan_id": "walk-demo-001",
-        "steps": [
-            {
-                "skill": "walk",
-                "action": "move_forward",
-                "parameters": {"distance_m": 10, "speed": "normal"},
-            },
-            {
-                "skill": "walk",
-                "action": "turn",
-                "parameters": {"angle_deg": 90},
-            },
-            {
-                "skill": "walk",
-                "action": "move_forward",
-                "parameters": {"distance_m": 5, "speed": "normal"},
-            },
-        ],
-    }
+    started = time.monotonic()
+    plan = _walk_plan()
 
-    # Simulate an obstacle event
     obstacle_event = {
         "type": "obstacle_detected",
         "location": {"x": 5.0, "y": 0.0},
@@ -62,79 +103,61 @@ async def demo_walk_obstacle(supervisor: Any) -> None:
         "sensor": "front_lidar",
         "distance_cm": 30,
     }
-
     context = {
         "robot_id": "robot-001",
-        "current_position": {"x": 0, "y": 0},
+        "current_position": {"x": 5, "y": 0},
         "destination": {"x": 10, "y": 5},
     }
 
     logger.info(
-        "obstacle_detected",
-        obstacle=obstacle_event,
-        current_plan=plan,
+        "walk_obstacle_demo_starting",
+        plan_id=plan.plan_id,
+        paused_at_step=plan.current_step,
+        obstacle=obstacle_event["obstacle_type"],
     )
 
-    # Step 1: Pause current execution
-    logger.info("pausing_execution")
-    await asyncio.sleep(0.1)
-
-    # Step 2: Think — what do we do about this obstacle?
-    logger.info("thinking_about_obstacle")
-    await asyncio.sleep(0.1)
-
-    # Step 3: Replan — create a new plan that navigates around
-    updated_plan = {
-        "plan_id": "walk-demo-001-replanned",
-        "steps": [
-            {
-                "skill": "walk",
-                "action": "stop",
-                "parameters": {},
-            },
-            {
-                "skill": "navigate_around",
-                "action": "find_alternate_path",
-                "parameters": {
-                    "obstacle_location": obstacle_event["location"],
-                    "destination": context["destination"],
-                },
-            },
-            {
-                "skill": "walk",
-                "action": "follow_path",
-                "parameters": {
-                    "path": [
-                        {"x": 0, "y": -2},
-                        {"x": 12, "y": -2},
-                        {"x": 12, "y": 5},
-                        {"x": 10, "y": 5},
-                    ]
-                },
-            },
-        ],
-    }
+    # Interrupt → think → replan (all real work, no sleeps).
+    revised = await handler.handle_interrupt(plan, obstacle_event, context)
 
     logger.info(
-        "plan_updated",
-        original_steps=len(plan["steps"]),
-        updated_steps=len(updated_plan["steps"]),
+        "plan_replanned",
+        original_steps=len(plan.steps),
+        revised_steps=len(revised.steps),
+        revised_plan_id=revised.plan_id,
+        reasoning=revised.reasoning[:160],
     )
 
-    # Step 4: Execute updated plan
-    logger.info("resuming_execution_with_new_plan")
-    for i, step in enumerate(updated_plan["steps"]):
+    # Resume — the revised plan starts from its first step.
+    remaining = await handler.resume_plan(revised, from_step=0)
+    for i, step in enumerate(remaining):
         logger.info(
             "executing_step",
             step_index=i,
-            skill=step["skill"],
-            action=step["action"],
+            skill=step.skill_name,
+            action=step.action,
+            parameters=step.parameters,
         )
-        await asyncio.sleep(0.05)
 
-    # Step 5: Report completion
+    executed = False
+    if supervisor is not None and hasattr(supervisor, "_execute_plan"):
+        await supervisor._execute_plan(revised, context)
+        executed = True
+
     logger.info(
         "walk_obstacle_demo_complete",
-        total_duration_ms=500,
-        obstacle_handled=True,
+        duration_ms=round((time.monotonic() - started) * 1000, 2),
+        steps_resumed=len(remaining),
+        dispatched_to_drivers=executed,
     )
+    return revised
+
+
+def _resolve_handler(supervisor: Any) -> Any:
+    """Pull the interrupt handler out of a supervisor, if it has one."""
+    if supervisor is None:
+        return None
+    handler = getattr(supervisor, "_interrupt_handler", None)
+    if handler is not None:
+        return handler
+    loop = getattr(supervisor, "_cognitive_loop", None)
+    return getattr(loop, "_interrupt_handler", None)
