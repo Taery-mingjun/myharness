@@ -124,6 +124,15 @@ class SkillDefinition(BaseModel):
         default_factory=dict,
         description="The actual execution template — driver-specific action definition",
     )
+    allowed_actions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Explicit allowlist of driver actions this skill may invoke. "
+            "Empty means the allowlist is derived from action_template "
+            "(see resolve_allowed_actions). Use ['*'] to deliberately grant "
+            "the skill unrestricted access to its driver."
+        ),
+    )
 
     # Runtime config
     timeout_seconds: float = Field(default=60.0, ge=0.0)
@@ -156,6 +165,70 @@ class SkillDefinition(BaseModel):
 
     model_config = {"json_schema_extra": {"source_of_truth": True}}
 
+    def permits_action(self, action: str) -> bool:
+        """Whether this skill authorises ``action`` on its driver.
+
+        The execution layer resolves a skill to a ``driver_type`` and then
+        asks the driver to perform an action. Without this check the skill
+        is only a pointer to a driver, and any action string that reaches
+        the executor — including one produced by a prompt-injected plan —
+        runs with the skill's privileges.
+        """
+        return action_is_permitted(self, action)
+
+
+def resolve_allowed_actions(skill: Any) -> set[str]:
+    """Resolve the set of driver actions a skill definition authorises.
+
+    Accepts any skill-shaped object (not just :class:`SkillDefinition`) so
+    the execution guard can evaluate duck-typed skills without silently
+    waving them through.
+
+    Resolution order, first match wins:
+
+    1. ``allowed_actions`` — the explicit operator-authored allowlist.
+    2. ``action_template["actions"]`` — a template listing several actions.
+    3. ``action_template["action"]`` — the single templated action.
+    4. ``{skill.name}`` — a skill named ``walk`` may perform ``walk``.
+
+    Step 4 is the conservative default: it keeps skills that predate the
+    allowlist working for their own action while still refusing every
+    other action on the driver.
+    """
+    explicit = getattr(skill, "allowed_actions", None) or []
+    if isinstance(explicit, (list, tuple, set)):
+        names = {str(a).strip() for a in explicit if str(a).strip()}
+        if names:
+            return names
+
+    template = getattr(skill, "action_template", None) or {}
+    if isinstance(template, dict):
+        listed = template.get("actions")
+        if isinstance(listed, (list, tuple, set)):
+            names = {str(a).strip() for a in listed if str(a).strip()}
+            if names:
+                return names
+
+        single = template.get("action")
+        if isinstance(single, str) and single.strip():
+            return {single.strip()}
+
+    name = str(getattr(skill, "name", "") or "").strip()
+    return {name} if name else set()
+
+
+def action_is_permitted(skill: Any, action: str) -> bool:
+    """Check ``action`` against a skill's resolved allowlist.
+
+    An empty action is never permitted — an unnamed action carries no
+    intent to authorise.
+    """
+    if not isinstance(action, str) or not action.strip():
+        return False
+
+    allowed = resolve_allowed_actions(skill)
+    return "*" in allowed or action.strip() in allowed
+
 
 # ── Skill Proposal (from LLM Reflection → Compile) ────────────────────
 
@@ -172,6 +245,10 @@ class SkillProposal(BaseModel):
     output_schema: dict[str, Any] = Field(default_factory=dict)
     driver_type: str = Field(default="api")
     action_template: dict[str, Any] = Field(default_factory=dict)
+    allowed_actions: list[str] = Field(
+        default_factory=list,
+        description="Driver actions the proposed skill should be allowed to invoke",
+    )
     compiled_from: list[str] = Field(default_factory=list)
     reasoning: str = Field(
         default="",

@@ -115,6 +115,61 @@ class SkillValidator:
                     "no action template defined"
                 )
 
+        errors.extend(SkillValidator._validate_action_boundary(skill))
+
+        return errors
+
+    @staticmethod
+    def _validate_action_boundary(skill: SkillDefinition) -> list[str]:
+        """Validate the skill's declared driver-action boundary.
+
+        The boundary is what stops a skill from becoming a general-purpose
+        handle to its driver, so an incoherent one is a real defect rather
+        than a style issue — most importantly a skill whose own templated
+        action sits outside its allowlist, which can never execute.
+        """
+        errors: list[str] = []
+        declared = skill.allowed_actions or []
+
+        seen: set[str] = set()
+        for entry in declared:
+            if not isinstance(entry, str) or not entry.strip():
+                errors.append(
+                    f"Skill '{skill.name}' has an empty entry in allowed_actions"
+                )
+                continue
+            name = entry.strip()
+            if name in seen:
+                errors.append(
+                    f"Skill '{skill.name}' lists action '{name}' twice in "
+                    "allowed_actions"
+                )
+            seen.add(name)
+
+        if "*" in seen and len(seen) > 1:
+            errors.append(
+                f"Skill '{skill.name}' combines the '*' wildcard with named "
+                f"actions {sorted(seen - {'*'})}; the wildcard already grants "
+                "them, so the narrower entries are misleading"
+            )
+
+        # A skill whose template action is outside its own allowlist can
+        # never run its template — the boundary would reject it at dispatch.
+        template = skill.action_template or {}
+        templated = template.get("action") if isinstance(template, dict) else None
+        if (
+            seen
+            and "*" not in seen
+            and isinstance(templated, str)
+            and templated.strip()
+            and templated.strip() not in seen
+        ):
+            errors.append(
+                f"Skill '{skill.name}' templates action '{templated.strip()}' "
+                f"but its allowed_actions are {sorted(seen)}; the skill could "
+                "never execute its own template"
+            )
+
         return errors
 
     @staticmethod

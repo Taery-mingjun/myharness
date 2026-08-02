@@ -208,6 +208,22 @@ def build_container(settings: "Settings") -> "Container":
     container[ResourceScheduler] = Singleton(lambda c: ResourceScheduler())
     container[RuntimeMonitor] = RuntimeMonitor()
 
+    # Authorisation. The guard sits between a plan step and a driver call;
+    # without it a skill is only a pointer to a driver and any action an
+    # LLM emits runs with that skill's privileges.
+    from myharness.harness.guard import ExecutionGuard
+    from myharness.harness.permission import PermissionManager
+
+    container[PermissionManager] = Singleton(lambda c: PermissionManager(
+        default_policy=settings.permission_default_policy,
+        superusers=[settings.system_actor],
+    ))
+    container[ExecutionGuard] = Singleton(lambda c: ExecutionGuard(
+        permission_manager=c[PermissionManager],
+        system_actor=settings.system_actor,
+        enforce=settings.enforce_execution_boundary,
+    ))
+
     # ── Level 11: Runtime Layer (event loop, state, interrupts) ───────
     from myharness.runtime.interrupt import InterruptHandler
     from myharness.runtime.loop import EventLoop
@@ -239,6 +255,7 @@ def build_container(settings: "Settings") -> "Container":
         scheduler=c[ResourceScheduler],
         monitor=c[RuntimeMonitor],
         cognitive_loop=c[EventLoop],
+        execution_guard=c[ExecutionGuard],
     ))
 
     logger.info(

@@ -132,3 +132,13 @@ class EventBusError(MyHarnessError):
 
 class HarnessError(MyHarnessError):
     """Raised when the Harness supervisor encounters an error."""
+
+
+class PermissionDeniedError(HarnessError):
+    """Raised when an execution request fails an authorisation check.
+
+    The reason is carried in ``code`` so audit logs and callers can tell a
+    retired skill (``SKILL_ARCHIVED``) apart from an action outside the
+    skill's declared boundary (``ACTION_NOT_PERMITTED``) apart from an
+    actor without the necessary grant (``ACTOR_NOT_PERMITTED``).
+    """

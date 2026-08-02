@@ -118,6 +118,25 @@ class Settings(BaseSettings):
         description="Allowed headers for CORS.",
     )
 
+    # ── Execution Authorisation ────────────────────────────────────────
+
+    system_actor: str = Field(
+        default="system",
+        description="Actor attributed to plan steps that carry no explicit actor.",
+    )
+    enforce_execution_boundary: bool = Field(
+        default=True,
+        description="Block plan steps that fall outside their skill's declared "
+        "action boundary. Set False only to audit a policy against live "
+        "traffic — denials are then logged but still executed.",
+    )
+    permission_default_policy: str = Field(
+        default="deny",
+        description="RBAC decision when no grant matches: 'deny' (fail-closed) "
+        "or 'allow'. The system_actor is granted full access at container "
+        "build time, so the default single-agent deployment works unchanged.",
+    )
+
     # ── Logging ────────────────────────────────────────────────────────
 
     log_level: str = Field(default="INFO", description="Logging level")

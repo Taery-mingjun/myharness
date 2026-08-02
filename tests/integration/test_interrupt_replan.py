@@ -26,6 +26,7 @@ import pytest
 from myharness.llm.engine import LLMEngine, Plan, PlanStep
 from myharness.runtime.interrupt import InterruptHandler
 from myharness.runtime.interrupt import Plan as InterruptPlan
+from myharness.schema.skill import SkillDefinition, SkillStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -59,11 +60,28 @@ class FakeEngine:
         return self._plan_result
 
 
-class FakeSkill:
-    def __init__(self, name: str, capability: str, driver_type: str):
-        self.name = name
-        self.capability = capability
-        self.driver_type = driver_type
+def FakeSkill(
+    name: str,
+    capability: str,
+    driver_type: str,
+    allowed_actions: list[str] | None = None,
+) -> SkillDefinition:
+    """Build a real SkillDefinition.
+
+    This used to be a bare stub with three attributes. A stub that does
+    not carry the fields the production code reads — here the action
+    boundary — lets a test pass against behaviour the real object would
+    reject, which is the same drift the parity tests above exist to catch.
+    """
+    return SkillDefinition(
+        name=name,
+        version="1.0.0",
+        status=SkillStatus.STABLE,
+        capability=capability,
+        driver_type=driver_type,
+        allowed_actions=allowed_actions
+        or ["navigate_around", "walk_forward", "stop", name],
+    )
 
 
 class FakeRegistry:

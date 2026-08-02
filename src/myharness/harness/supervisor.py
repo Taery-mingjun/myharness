@@ -13,6 +13,7 @@ from typing import Any
 
 import structlog
 
+from myharness.harness.guard import ExecutionGuard
 from myharness.schema.event import (
     SystemShutdownEvent,
     SystemStartupEvent,
@@ -48,6 +49,7 @@ class HarnessSupervisor:
         scheduler: Any,
         monitor: Any,
         cognitive_loop: Any = None,
+        execution_guard: Any = None,
     ) -> None:
         """Initialize the harness supervisor.
 
@@ -65,6 +67,9 @@ class HarnessSupervisor:
                 queue and routes events through the cognitive pipeline. When
                 provided it becomes the queue's sole consumer and the bus's
                 built-in queue processor is left dormant.
+            execution_guard: Authorises every plan step before it reaches a
+                driver. Defaults to an enforcing :class:`ExecutionGuard`
+                with no RBAC — the skill boundary is never optional.
         """
         self._event_bus = event_bus
         self._router = router
@@ -76,6 +81,13 @@ class HarnessSupervisor:
         self._scheduler = scheduler
         self._monitor = monitor
         self._cognitive_loop = cognitive_loop
+
+        # The skill boundary is what makes the Skill power constrain the
+        # Execution power. A control that only applies when a dependency
+        # happens to be injected is not a control, so a default enforcing
+        # guard is built when none is supplied. Pass an explicit guard to
+        # attach RBAC or to run in audit-only mode.
+        self._execution_guard = execution_guard or ExecutionGuard()
 
         self._boot_time: float = 0.0
         self._is_running = False
@@ -382,23 +394,55 @@ class HarnessSupervisor:
     ) -> None:
         """Execute a plan's steps using the appropriate drivers.
 
+        Every step is authorised before it reaches a driver. Plan steps
+        come from the LLM, whose context includes retrieved memories and
+        tool output, so a step is untrusted input: the skill it names only
+        grants the actions that skill declares.
+
+        A denial aborts the whole plan rather than skipping the step. The
+        remaining steps were composed on the assumption that the denied
+        one ran, and a plan containing an unauthorised step is not a plan
+        worth finishing.
+
+        ``plan.current_step`` tracks the cursor so an interrupt mid-plan
+        resumes at the step that did not complete.
+
         Args:
             plan: A Plan object with ordered steps.
-            context: The execution context.
+            context: The execution context. An ``actor`` key overrides the
+                actor attributed to these steps.
+
+        Raises:
+            PermissionDeniedError: If a step fails authorisation.
         """
         steps = getattr(plan, "steps", [])
-        for step in steps:
+        actor = (context or {}).get("actor")
+
+        for index, step in enumerate(steps):
             skill_name = getattr(step, "skill_name", "") or ""
             action = getattr(step, "action", "") or ""
             parameters = getattr(step, "parameters", {}) or {}
 
+            if hasattr(plan, "current_step"):
+                plan.current_step = index
+
             # Find matching skill
             skill = await self._skill_store.get_by_name(skill_name)
+
+            # Authorise before dispatch. This must sit outside the try
+            # below: that block swallows driver failures, and a swallowed
+            # authorisation failure is an authorisation failure that let
+            # the next step run.
+            await self._execution_guard.authorize(
+                skill=skill,
+                action=action,
+                skill_name=skill_name,
+                actor=actor,
+            )
+
             if skill is None:
-                logger.warning(
-                    "skill_not_found_for_step",
-                    skill_name=skill_name,
-                )
+                # Only reachable with a non-enforcing (audit-only) guard.
+                logger.warning("skill_not_found_for_step", skill_name=skill_name)
                 continue
 
             # Execute via driver
@@ -421,6 +465,9 @@ class HarnessSupervisor:
                     action=action,
                     error=str(exc),
                 )
+
+            if hasattr(plan, "current_step"):
+                plan.current_step = index + 1
 
     @property
     def is_shut_down(self) -> bool:

@@ -24,6 +24,11 @@ class SkillCreateRequest(BaseModel):
     capability: str = Field(..., description="The capability this skill provides")
     driver_type: str = Field(default="api", description="Target driver type")
     action_template: dict[str, Any] = Field(default_factory=dict)
+    allowed_actions: list[str] = Field(
+        default_factory=list,
+        description="Driver actions this skill may invoke. Empty derives the "
+        "allowlist from action_template; ['*'] deliberately removes the limit.",
+    )
     parameters: list[dict[str, Any]] = Field(default_factory=list)
     input_schema: dict[str, Any] = Field(default_factory=dict)
     output_schema: dict[str, Any] = Field(default_factory=dict)
@@ -142,6 +147,7 @@ async def create_skill(
         capability=req.capability,
         driver_type=req.driver_type,
         action_template=req.action_template,
+        allowed_actions=req.allowed_actions,
         parameters=parameters,
         input_schema=req.input_schema,
         output_schema=req.output_schema,
