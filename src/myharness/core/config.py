@@ -62,6 +62,21 @@ class Settings(BaseSettings):
         description="Default LLM provider: openai|anthropic|google|qwen|deepseek|local",
     )
 
+    # Embedding backend — may differ from the cognitive provider. Anthropic
+    # and DeepSeek expose no embeddings API, so vector memory needs a
+    # separate backend (e.g. 'openai' or 'local'). See P8 (replaceable compute).
+    embedding_provider: str = Field(
+        default="openai",
+        description="Provider used for embeddings (vector memory). "
+        "May differ from default_llm_provider, since Anthropic and DeepSeek "
+        "expose no embeddings API. Set to 'none' to disable vector memory "
+        "and rely on full-text search only.",
+    )
+    embedding_model: str = Field(
+        default="text-embedding-3-small",
+        description="Embedding model used by the embedding provider.",
+    )
+
     # ── Data Storage ───────────────────────────────────────────────────
 
     data_dir: Path = Field(default=Path("./data"), description="Root data directory")

@@ -220,9 +220,9 @@ class ContextBuilder:
                     top_k=top_k,
                 )
             )
-            if episodic_results and episodic_results.results:
+            if episodic_results:
                 lines = ["### Past Experiences"]
-                for i, result in enumerate(episodic_results.results, 1):
+                for i, result in enumerate(episodic_results, 1):
                     lines.append(f"{i}. {result.content}")
                     if result.score:
                         lines.append(f"   (relevance: {result.score:.2f})")
@@ -236,9 +236,9 @@ class ContextBuilder:
                     top_k=top_k,
                 )
             )
-            if semantic_results and semantic_results.results:
+            if semantic_results:
                 lines = ["### Known Facts"]
-                for i, result in enumerate(semantic_results.results, 1):
+                for i, result in enumerate(semantic_results, 1):
                     lines.append(f"{i}. {result.content}")
                 sections.append("\n".join(lines))
 
@@ -250,9 +250,9 @@ class ContextBuilder:
                     top_k=top_k,
                 )
             )
-            if relationship_results and relationship_results.results:
+            if relationship_results:
                 lines = ["### Known Relationships"]
-                for i, result in enumerate(relationship_results.results, 1):
+                for i, result in enumerate(relationship_results, 1):
                     lines.append(f"{i}. {result.content}")
                 sections.append("\n".join(lines))
 

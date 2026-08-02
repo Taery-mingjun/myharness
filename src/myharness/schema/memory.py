@@ -44,6 +44,11 @@ class IdentityEntry(BaseModel):
 
     entry_id: MemoryId = Field(default_factory=lambda: MemoryId(str(uuid.uuid4())))
     version: int = Field(default=1, ge=1, description="Monotonic identity version counter")
+    name: str = Field(
+        default="Agent",
+        max_length=128,
+        description="The agent's name — how it refers to itself and is referred to",
+    )
     core_values: list[str] = Field(
         default_factory=list,
         description="Fundamental values that guide decision-making (e.g., honesty, safety)",
