@@ -8,7 +8,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from myharness.api.dependencies import get_memory, verify_api_key
+from myharness.api.dependencies import get_memory
 from myharness.schema.memory import MemoryQuery, MemorySearchResult
 
 logger = structlog.get_logger(__name__)
@@ -64,6 +64,18 @@ class SearchResults(BaseModel):
     total: int
 
 
+class RecentEpisodesResponse(BaseModel):
+    """Recent episodic memories.
+
+    An explicit model rather than a ``dict[str, ...]`` annotation: the loose
+    form claimed every value was a list, so FastAPI rejected the integer
+    ``count`` at serialization time and turned a working handler into a 500.
+    """
+
+    episodes: list[dict[str, Any]]
+    count: int
+
+
 class MemoryStatsResponse(BaseModel):
     """Memory system statistics."""
 
@@ -102,7 +114,6 @@ async def get_identity(memory=Depends(get_memory)) -> IdentityResponse:
 @router.put("/identity")
 async def update_identity(
     update: IdentityUpdateRequest,
-    _: None = Depends(verify_api_key),
     memory=Depends(get_memory),
 ) -> dict[str, Any]:
     """Update the agent's identity.
@@ -166,17 +177,17 @@ async def search_memory(
 # ── Episodic Memory Endpoints ────────────────────────────────────────────
 
 
-@router.get("/episodes/recent")
+@router.get("/episodes/recent", response_model=RecentEpisodesResponse)
 async def get_recent_episodes(
     limit: int = Query(default=50, ge=1, le=500, description="Max episodes to return"),
     memory=Depends(get_memory),
-) -> dict[str, list[dict[str, Any]]]:
+) -> RecentEpisodesResponse:
     """Get the most recent episodic memories."""
     episodes = await memory.get_recent_episodes(limit)
-    return {
-        "episodes": [e.model_dump(mode="json") for e in episodes],
-        "count": len(episodes),
-    }
+    return RecentEpisodesResponse(
+        episodes=[e.model_dump(mode="json") for e in episodes],
+        count=len(episodes),
+    )
 
 
 # ── Stats & Maintenance ──────────────────────────────────────────────────
@@ -194,7 +205,6 @@ async def get_memory_stats(memory=Depends(get_memory)) -> MemoryStatsResponse:
 
 @router.post("/rebuild")
 async def rebuild_indexes(
-    _: None = Depends(verify_api_key),
     memory=Depends(get_memory),
 ) -> dict[str, str]:
     """Rebuild all derived indexes from source data.

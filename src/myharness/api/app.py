@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from myharness.api.middleware.error_handler import ErrorHandlerMiddleware
@@ -99,13 +99,55 @@ def create_app(supervisor: Any = None) -> FastAPI:
     app.add_middleware(ErrorHandlerMiddleware)
 
     # Register API routers
+    from myharness.api.dependencies import verify_api_key
     from myharness.api.routers import cognitive, memory, skill, driver, harness, health
 
-    app.include_router(cognitive.router, prefix="/api/v1/cognitive", tags=["Cognitive"])
-    app.include_router(memory.router, prefix="/api/v1/memory", tags=["Memory"])
-    app.include_router(skill.router, prefix="/api/v1/skill", tags=["Skill"])
-    app.include_router(driver.router, prefix="/api/v1/driver", tags=["Driver"])
-    app.include_router(harness.router, prefix="/api/v1/harness", tags=["Harness"])
+    # Authentication is applied at the ROUTER level, not per-endpoint.
+    #
+    # Per-endpoint `Depends(verify_api_key)` is a fail-open pattern: every new
+    # route is unauthenticated until someone remembers to decorate it, and
+    # nothing fails loudly when they forget. That is exactly what happened
+    # here — reads and the entire cognitive router were publicly reachable
+    # while the auth dependency existed and looked correct.
+    #
+    # Binding the dependency to include_router() inverts the default: a new
+    # endpoint is protected the moment it is added, and exposing one requires
+    # a deliberate, reviewable change below.
+    protected = [Depends(verify_api_key)]
+
+    app.include_router(
+        cognitive.router,
+        prefix="/api/v1/cognitive",
+        tags=["Cognitive"],
+        dependencies=protected,
+    )
+    app.include_router(
+        memory.router,
+        prefix="/api/v1/memory",
+        tags=["Memory"],
+        dependencies=protected,
+    )
+    app.include_router(
+        skill.router,
+        prefix="/api/v1/skill",
+        tags=["Skill"],
+        dependencies=protected,
+    )
+    app.include_router(
+        driver.router,
+        prefix="/api/v1/driver",
+        tags=["Driver"],
+        dependencies=protected,
+    )
+    app.include_router(
+        harness.router,
+        prefix="/api/v1/harness",
+        tags=["Harness"],
+        dependencies=protected,
+    )
+
+    # Health is intentionally public: load balancers and orchestrators probe
+    # it without credentials. It must therefore never leak internal state.
     app.include_router(health.router, tags=["Health"])
 
     logger.info("api_app_created", version="0.1.0")

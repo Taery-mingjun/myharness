@@ -8,7 +8,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from myharness.api.dependencies import get_supervisor, verify_api_key
+from myharness.api.dependencies import get_supervisor
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -98,7 +98,6 @@ async def list_capabilities(
 @router.post("/execute", response_model=ExecuteResponse)
 async def execute_action(
     req: ExecuteRequest,
-    _: None = Depends(verify_api_key),
     supervisor=Depends(get_supervisor),
 ) -> ExecuteResponse:
     """Execute an action through a named driver.
