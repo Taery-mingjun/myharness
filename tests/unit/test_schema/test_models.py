@@ -5,7 +5,13 @@ from __future__ import annotations
 import pytest
 from datetime import datetime, timezone
 
-from myharness.schema.event import EventType, BaseEvent, UserMessageEvent, ThinkResultEvent
+from myharness.schema.event import (
+    EventType,
+    BaseEvent,
+    UserMessageEvent,
+    UserMessagePayload,
+    ThinkResultEvent,
+)
 from myharness.schema.memory import (
     MemoryCategory, IdentityEntry, EpisodicEntry, SemanticEntry,
     RelationshipEntry, MemoryQuery, MemorySearchResult
@@ -29,10 +35,21 @@ class TestEventSchema:
     def test_user_message_event(self):
         event = UserMessageEvent(
             source="api",
-            payload={"message": "Hello", "user_id": "test_user"},
+            payload={"content": "Hello", "role": "user"},
         )
         assert event.event_type == EventType.USER_MESSAGE
-        assert event.payload["message"] == "Hello"
+        assert event.payload.content == "Hello"
+        assert event.priority == 5  # Protocol 14.1 default priority
+
+    def test_typed_payload_from_dict(self):
+        # dict payloads are coerced into typed payload models (backward compat)
+        event = UserMessageEvent(source="api", payload={"content": "Hi"})
+        assert isinstance(event.payload, UserMessagePayload)
+        assert event.payload.content == "Hi"
+
+    def test_priority_field(self):
+        event = BaseEvent(event_type=EventType.HEARTBEAT, source="test", priority=9)
+        assert event.priority == 9
 
     def test_event_correlation(self):
         event1 = BaseEvent(event_type=EventType.USER_MESSAGE, source="api")

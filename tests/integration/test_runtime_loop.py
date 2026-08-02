@@ -42,7 +42,7 @@ def _cpu_time() -> float:
 
 
 def _msg(i: int = 0) -> UserMessageEvent:
-    return UserMessageEvent(source="test", payload={"i": i})
+    return UserMessageEvent(source="test", payload={"content": f"msg-{i}"})
 
 
 @pytest.fixture
@@ -184,7 +184,7 @@ class TestEventProcessing:
         seen: list[int] = []
 
         async def handler(event):
-            seen.append(event.payload["i"])
+            seen.append(int(event.payload.content.split("-")[1]))
 
         event_bus.subscribe(EventType.USER_MESSAGE, handler)
         for i in range(8):
@@ -269,7 +269,7 @@ class TestErrorContainment:
         class ExplodingRouter:
             async def route(self, event):
                 nonlocal boom_count
-                if event.payload.get("i") == 0:
+                if event.payload.content == "msg-0":
                     boom_count += 1
                     raise RuntimeError("handler exploded")
                 return ["ok"]
