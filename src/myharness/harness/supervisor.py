@@ -178,6 +178,16 @@ class HarnessSupervisor:
         if hasattr(self._event_bus, "stop"):
             await self._event_bus.stop()
 
+        # Release memory subsystem resources LAST — after the bus has drained,
+        # so late-arriving handlers can still read/write memory. Unclosed
+        # aiosqlite connections keep non-daemon threads alive and block
+        # interpreter exit, so this must never be skipped.
+        if hasattr(self._memory, "close"):
+            try:
+                await self._memory.close()
+            except Exception:
+                logger.warning("memory_close_failed", exc_info=True)
+
         logger.info("harness_shutdown_complete")
 
     async def handle_user_message(
@@ -202,6 +212,8 @@ class HarnessSupervisor:
         Returns:
             The system's response string.
         """
+        from myharness.schema.memory import EpisodicEntry
+
         start_time = time.monotonic()
         logger.info(
             "handle_user_message",
@@ -210,65 +222,70 @@ class HarnessSupervisor:
         )
 
         try:
-            # Stage 1: Record episode
-            if hasattr(self._memory, "record_episode"):
-                await self._memory.record_episode({
-                    "type": "user_message",
-                    "user_id": user_id,
-                    "content": message,
-                })
-
-            # Stage 2: Build context
-            context: dict[str, Any] = {"user_id": user_id, "message": message}
-            if hasattr(self._memory, "get_context"):
-                memory_context = await self._memory.get_context(
-                    query=message, user_id=user_id
+            # Stage 1: Record the user message as an episodic entry
+            await self._memory.record_episode(
+                EpisodicEntry(
+                    summary=message[:200],
+                    category="conversation",
+                    detail=message,
+                    participants=[user_id],
+                    tags=["user_message"],
+                    importance=0.6,
                 )
-                context.update(memory_context or {})
+            )
+
+            # Stage 2: Build context from memory (hybrid search)
+            context: dict[str, Any] = {"user_id": user_id, "message": message}
+            from myharness.schema.memory import MemoryQuery, MemoryCategory
+
+            related = await self._memory.search(
+                MemoryQuery(
+                    query_text=message,
+                    categories=[MemoryCategory.EPISODIC, MemoryCategory.SEMANTIC],
+                    top_k=5,
+                    min_importance=0.0,
+                )
+            )
+            if related:
+                context["related_memories"] = [
+                    r.content for r in related if r.score >= 0.3
+                ]
 
             # Stage 3: Think
-            thought: str = ""
-            if hasattr(self._llm_engine, "think"):
-                thought = await self._llm_engine.think(
-                    message=message, context=context
-                )
+            thought: str = await self._llm_engine.think(message, context=context)
 
-            # Stage 4: Plan
-            plan: dict[str, Any] | None = None
-            if hasattr(self._llm_engine, "plan"):
-                available_skills = await self._skill_store.list_all()
-                plan = await self._llm_engine.plan(
-                    thought=thought,
-                    context=context,
-                    available_skills=[
-                        {"name": s.name, "capability": s.capability}
-                        for s in available_skills
-                    ],
-                )
+            # Stage 4: Plan (using available skills)
+            available_skills = await self._skill_store.list_all()
+            skill_summaries = [
+                {"name": s.name, "capability": s.capability, "driver_type": s.driver_type}
+                for s in available_skills
+            ]
+            plan = await self._llm_engine.plan(thought or message, skill_summaries, context=context)
 
-            # Stage 5: Execute (if plan requires it)
-            if plan and plan.get("steps"):
+            # Stage 5: Execute (if plan has steps)
+            if plan and getattr(plan, "steps", None):
                 await self._execute_plan(plan, context)
 
-            # Stage 6: Reflect
-            reflection: str = ""
-            if hasattr(self._llm_engine, "reflect"):
-                reflection = await self._llm_engine.reflect(
-                    message=message,
-                    thought=thought,
-                    plan=plan,
-                    context=context,
-                )
-
-            # Stage 7: Update memory
-            if hasattr(self._memory, "update_episode"):
-                await self._memory.update_episode({
-                    "type": "interaction_complete",
-                    "user_id": user_id,
+            # Stage 6: Reflect on the interaction
+            reflection = await self._llm_engine.reflect(
+                experience={
+                    "user_message": message,
                     "thought": thought,
-                    "plan": plan,
-                    "reflection": reflection,
-                })
+                    "plan": getattr(plan, "reasoning", ""),
+                }
+            )
+
+            # Stage 7: Persist the interaction outcome as a new episode
+            await self._memory.record_episode(
+                EpisodicEntry(
+                    summary=f"Interaction with {user_id}",
+                    category="interaction",
+                    detail=f"User: {message}\nThought: {thought}\nReflection: {getattr(reflection, 'summary', '')}",
+                    participants=[user_id],
+                    tags=["interaction_complete", "reflection"],
+                    importance=0.7,
+                )
+            )
 
             # Record metrics
             duration_ms = (time.monotonic() - start_time) * 1000
@@ -329,19 +346,19 @@ class HarnessSupervisor:
         logger.info("cognitive_loop_stopped")
 
     async def _execute_plan(
-        self, plan: dict[str, Any], context: dict[str, Any]
+        self, plan: Any, context: dict[str, Any]
     ) -> None:
         """Execute a plan's steps using the appropriate drivers.
 
         Args:
-            plan: The execution plan with steps.
+            plan: A Plan object with ordered steps.
             context: The execution context.
         """
-        steps = plan.get("steps", [])
+        steps = getattr(plan, "steps", [])
         for step in steps:
-            skill_name = step.get("skill", "")
-            action = step.get("action", "")
-            parameters = step.get("parameters", {})
+            skill_name = getattr(step, "skill_name", "") or ""
+            action = getattr(step, "action", "") or ""
+            parameters = getattr(step, "parameters", {}) or {}
 
             # Find matching skill
             skill = await self._skill_store.get_by_name(skill_name)
@@ -363,7 +380,7 @@ class HarnessSupervisor:
                     "step_executed",
                     skill_name=skill_name,
                     action=action,
-                    success=result.success,
+                    success=getattr(result, "success", False),
                 )
             except Exception as exc:
                 logger.error(

@@ -7,10 +7,12 @@ relationship) and provides cross-store hybrid search. Implements P9
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 import structlog
 
+from myharness.memory.embedder import Embedder, NullEmbedder
 from myharness.memory.interface import MemorySystem
 from myharness.memory.stores.identity import IdentityStore
 from myharness.memory.stores.episodic import EpisodicStore
@@ -49,11 +51,17 @@ class MemoryManager(MemorySystem):
         episodic: EpisodicStore,
         semantic: SemanticStore,
         relationship: RelationshipStore,
+        embedder: Embedder | None = None,
     ) -> None:
         self._identity = identity
         self._episodic = episodic
         self._semantic = semantic
         self._relationship = relationship
+        # Memory owns indexing, so it owns embedding generation. It depends on
+        # the narrow EmbeddingPort, never on the LLM System — preserving the
+        # four-power separation. Absent an embedder, memory degrades to
+        # text-only search rather than silently storing un-indexed vectors.
+        self._embedder = embedder or NullEmbedder()
 
     # ── Identity ────────────────────────────────────────────────────────
 
@@ -74,7 +82,18 @@ class MemoryManager(MemorySystem):
     # ── Episodic ────────────────────────────────────────────────────────
 
     async def record_episode(self, entry: EpisodicEntry) -> str:
-        """Record a new episodic entry."""
+        """Record a new episodic entry, vectorizing it for semantic recall.
+
+        The embedding is generated here rather than pushed onto callers: every
+        write path (supervisor, API, reflection loop) would otherwise have to
+        remember to do it, and forgetting is silent — the entry persists but is
+        invisible to vector search.
+
+        If embedding is unavailable, the entry is still recorded and remains
+        findable via full-text search.
+        """
+        if entry.embedding is None:
+            entry = await self._with_embedding(entry)
         return await self._episodic.record(entry)
 
     async def get_episode(self, episode_id: str) -> EpisodicEntry | None:
@@ -151,6 +170,11 @@ class MemoryManager(MemorySystem):
         """
         categories = query.categories or list(MemoryCategory)
         all_results: list[MemorySearchResult] = []
+
+        # Vectorize the query once and reuse it across stores: without an
+        # embedding the stores silently fall back to keyword-only matching,
+        # which defeats the purpose of semantic recall.
+        query = await self._with_query_embedding(query)
 
         if MemoryCategory.EPISODIC in categories:
             try:
@@ -305,3 +329,97 @@ class MemoryManager(MemorySystem):
             stats["indexes"]["vector_count"] = 0
 
         return stats
+
+    # ── Embedding helpers ───────────────────────────────────────────────
+
+    @staticmethod
+    def _episode_text(entry: EpisodicEntry) -> str:
+        """Build the text representation of an episode used for embedding.
+
+        Summary and detail are joined so that recall works both from a
+        high-level gist and from specifics buried in the detail.
+        """
+        parts = [entry.summary]
+        if entry.detail:
+            parts.append(entry.detail)
+        return "\n".join(p for p in parts if p)
+
+    async def _with_embedding(self, entry: EpisodicEntry) -> EpisodicEntry:
+        """Return a copy of the entry with its embedding populated.
+
+        Returns the entry unchanged when embedding is unavailable, so the
+        write always proceeds.
+        """
+        if not self._embedder.enabled:
+            return entry
+
+        vector = await self._embedder.embed_one(self._episode_text(entry))
+        if vector is None:
+            return entry
+
+        return entry.model_copy(update={"embedding": vector})
+
+    async def _with_query_embedding(self, query: MemoryQuery) -> MemoryQuery:
+        """Return a copy of the query with ``query_embedding`` populated.
+
+        Respects a caller-supplied embedding and skips work when the query has
+        no text or embedding is unavailable.
+        """
+        if query.query_embedding is not None:
+            return query
+        if not query.query_text.strip() or not self._embedder.enabled:
+            return query
+
+        vector = await self._embedder.embed_one(query.query_text)
+        if vector is None:
+            return query
+
+        return query.model_copy(update={"query_embedding": vector})
+
+    # ── Lifecycle ───────────────────────────────────────────────────────
+
+    async def close(self) -> None:
+        """Release all backing resources held by the memory subsystem.
+
+        Closes every distinct storage/index backend reachable from the four
+        stores. This is mandatory for graceful shutdown: ``aiosqlite`` spawns
+        a NON-daemon worker thread per connection, so an unclosed connection
+        prevents the interpreter from ever exiting (the process hangs in
+        ``threading._shutdown`` and must be SIGKILLed by the supervisor).
+
+        Backends are deduplicated by identity because the stores share the
+        same SourceOfTruth/DerivedStorage/VectorIndex/TextIndex instances,
+        and closed best-effort so one failure cannot strand the others.
+        """
+        seen: set[int] = set()
+        backends: list[Any] = []
+
+        for store in (
+            self._identity,
+            self._episodic,
+            self._semantic,
+            self._relationship,
+        ):
+            for attr in ("_source", "_derived", "_vector_idx", "_text_idx"):
+                backend = getattr(store, attr, None)
+                if backend is None or id(backend) in seen:
+                    continue
+                seen.add(id(backend))
+                backends.append(backend)
+
+        for backend in backends:
+            closer = getattr(backend, "close", None)
+            if closer is None:
+                continue
+            try:
+                result = closer()
+                if inspect.isawaitable(result):
+                    await result
+            except Exception:
+                logger.warning(
+                    "memory_backend_close_failed",
+                    backend=type(backend).__name__,
+                    exc_info=True,
+                )
+
+        logger.info("memory_manager_closed", backends_closed=len(backends))
