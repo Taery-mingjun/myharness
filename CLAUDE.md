@@ -57,6 +57,13 @@ LLM ≠ Agent ≠ Memory ≠ Skill ≠ Execution ≠ Hardware。所有模块完�
 - **环境**：`.venv/` 已建；`.env.example` 可复制为 `.env` 填 LLM API Keys
 - **待确认参考**：`C:\Users\10444\.claude\plans\myharness-bubbly-cloud.md` 是旧会话（安全审计向）写的 B2/B3/B4 落地计划（登录限速、shell 沙箱、TLS 前置）——**尚未与本 v1.1 大纲对齐，执行任何内容前需用户确认**
 
+## 工程计划与追踪（必读）
+
+- **工程落地计划书**：`docs/PROJECT_PLAN.md` —— 阶段划分 S0–S5、工程规范、多 agent 模块所有权矩阵与防冲突规则
+- **进度追踪**：`PROGRESS.md` —— 阶段状态 + 决策记录，每阶段完成必须更新并提交 gitee
+- 当前阶段：S0 基线 ✅ / S1 现有代码审查（进行中）
+- 多 agent 规则：一次一个 agent 一个模块；分支隔离；改动登记到 PROGRESS.md；harness/core 改动需用户知悉
+
 ## 工作约定（防多会话混乱）
 
 1. **所有会话必须在本目录打开**（`cd C:\Users\10444\gitee_myharness_fetch\myharness`），不要从 C:\Users\10444 或 D:\Microsoft VS Code 根目录开工作会话
