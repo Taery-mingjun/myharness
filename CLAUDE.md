@@ -61,7 +61,8 @@ LLM ≠ Agent ≠ Memory ≠ Skill ≠ Execution ≠ Hardware。所有模块完�
 
 - **工程落地计划书**：`docs/PROJECT_PLAN.md` —— 阶段划分 S0–S5、工程规范、多 agent 模块所有权矩阵与防冲突规则
 - **进度追踪**：`PROGRESS.md` —— 阶段状态 + 决策记录，每阶段完成必须更新并提交 gitee
-- 当前阶段：S0 基线 ✅ / S1 现有代码审查（进行中）
+- 当前阶段：S0–S4 全部完成 ✅ / S5 验证发布（进行中，2026-08-02）
+- S4 成果：协议文档 `docs/protocol/01–05`、Event 强类型化（priority + 27 载荷模型）、MCP 真实驱动（官方 SDK）、skill 测试 98–100%；349 测试通过、覆盖 70%
 - 多 agent 规则：一次一个 agent 一个模块；分支隔离；改动登记到 PROGRESS.md；harness/core 改动需用户知悉
 
 ## 工作约定（防多会话混乱）

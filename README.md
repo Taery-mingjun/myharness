@@ -2,6 +2,23 @@
 
 MyHarness (MYH) 是一个认知操作系统，实现了LLM Agent的四权分离架构：Compute(算力)、Memory(记忆)、Skill(能力)、Execution(执行)完全解耦。
 
+> **v0.2.0**（2026-08-02）：协议文档 14.1–14.5 落地（`docs/protocol/`）、Event 强类型化、MCP 真实驱动（官方 SDK）、349 测试通过 / 覆盖 70%。
+
+## 协议规范（Protocol v0.1，依据设计稿 §14）
+
+| 规范 | 文档 | 状态 |
+|---|---|---|
+| 14.1 Event Schema | `docs/protocol/01-event-schema.md` | ✅ 已实现（priority + 强类型载荷） |
+| 14.2 Memory API | `docs/protocol/02-memory-api.md` | ✅ 已实现 |
+| 14.3 Skill Interface | `docs/protocol/03-skill-interface.md` | ✅ 已实现 |
+| 14.4 Execution Driver | `docs/protocol/04-execution-driver.md` | ✅ 已实现（含 MCP SDK 客户端） |
+| 14.5 LLM Provider | `docs/protocol/05-llm-provider.md` | ✅ 已实现（多 Provider 可插拔） |
+
+## 项目文档
+
+- 设计稿 v1.1：`myharness1.1(1).pdf`（桌面）
+- 工程计划：`docs/PROJECT_PLAN.md` · 进度追踪：`PROGRESS.md` · 代码审查：`docs/REVIEW_REPORT.md` · 开源调研：`docs/OPENSOURCE_SURVEY.md`
+
 ## 架构原则
 
 - **P0**: LLM 是认知运行时，不是身份容器
