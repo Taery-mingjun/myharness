@@ -52,6 +52,11 @@ class RuntimeState(BaseModel):
         ge=0.0,
         description="System uptime in seconds",
     )
+    error_count: int = Field(
+        default=0,
+        ge=0,
+        description="Event fetch/dispatch failures since the loop started",
+    )
     metrics: dict[str, Any] = Field(
         default_factory=dict,
         description="Aggregated runtime metrics",
@@ -62,8 +67,14 @@ class RuntimeState(BaseModel):
     )
 
     model_config = {
+        # Validate on assignment as well. This object is mutated field by
+        # field while the loop runs, so without this the declared bounds
+        # (ge/le) would only ever apply at construction — a negative queue
+        # depth or an out-of-range cognitive load would slip silently into
+        # whatever monitoring reads this state.
+        "validate_assignment": True,
         "json_schema_extra": {
             "observable": True,
             "introspectable": True,
-        }
+        },
     }

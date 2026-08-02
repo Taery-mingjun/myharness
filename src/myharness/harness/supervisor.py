@@ -7,6 +7,7 @@ and shutdown.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -46,6 +47,7 @@ class HarnessSupervisor:
         driver_manager: Any,
         scheduler: Any,
         monitor: Any,
+        cognitive_loop: Any = None,
     ) -> None:
         """Initialize the harness supervisor.
 
@@ -59,6 +61,10 @@ class HarnessSupervisor:
             driver_manager: The execution driver manager.
             scheduler: The resource scheduler.
             monitor: The runtime monitor.
+            cognitive_loop: The runtime ``EventLoop`` that drains the event
+                queue and routes events through the cognitive pipeline. When
+                provided it becomes the queue's sole consumer and the bus's
+                built-in queue processor is left dormant.
         """
         self._event_bus = event_bus
         self._router = router
@@ -69,9 +75,11 @@ class HarnessSupervisor:
         self._driver_manager = driver_manager
         self._scheduler = scheduler
         self._monitor = monitor
+        self._cognitive_loop = cognitive_loop
 
         self._boot_time: float = 0.0
         self._is_running = False
+        self._has_shut_down = False
         self._active_tasks: dict[str, Any] = {}
 
         logger.info("harness_supervisor_initialized")
@@ -90,9 +98,15 @@ class HarnessSupervisor:
         self._boot_time = time.monotonic()
         logger.info("harness_boot_starting")
 
-        # Start event bus
+        # Start event bus. The queue admits exactly one consumer: when a
+        # cognitive loop is attached it drains the queue *through the Router*,
+        # so the bus's built-in processor (which publishes raw and bypasses
+        # routing rules entirely) must stay dormant.
         if hasattr(self._event_bus, "start"):
-            await self._event_bus.start()
+            if self._cognitive_loop is None:
+                await self._event_bus.start()
+            else:
+                await self._event_bus.start(with_queue_processor=False)
 
         # Initialize memory
         if hasattr(self._memory, "initialize"):
@@ -101,6 +115,10 @@ class HarnessSupervisor:
         # Start the monitor heartbeat
         if hasattr(self._monitor, "start_heartbeat"):
             await self._monitor.start_heartbeat()
+
+        # Start the cognitive loop (P4: one loop, no mode switching)
+        if self._cognitive_loop is not None:
+            await self._cognitive_loop.start()
 
         self._is_running = True
 
@@ -143,6 +161,18 @@ class HarnessSupervisor:
         """
         logger.info("harness_shutdown_starting")
         self._is_running = False
+        # Terminal, in-process: memory backends get closed below and are not
+        # reopened. Health probes read this so an orchestrator stops routing
+        # traffic here instead of holding a zombie in the pool.
+        self._has_shut_down = True
+
+        # Stop the cognitive loop first so it stops pulling events, then
+        # release its claim on the queue before the bus is torn down.
+        if self._cognitive_loop is not None:
+            try:
+                await self._cognitive_loop.stop()
+            except Exception:
+                logger.warning("cognitive_loop_stop_failed", exc_info=True)
 
         # Cancel active tasks
         for task_id in list(self._active_tasks.keys()):
@@ -315,33 +345,35 @@ class HarnessSupervisor:
             return f"I encountered an error processing your message: {exc}"
 
     async def run_cognitive_loop(self) -> None:
-        """Main event-driven cognitive loop.
+        """Run the cognitive loop in the foreground until shutdown.
 
-        Continuously processes events from the event bus through the
-        cognitive pipeline. Runs until shutdown is requested.
+        Delegates to the injected ``EventLoop`` — the single cognitive
+        consumer of the event queue (P0: one cognitive center). This method
+        must not grow a second, divergent loop implementation: the previous
+        inline version polled an event-bus API that did not exist, never
+        awaited anything that yields, and therefore starved the entire
+        asyncio event loop at 100% CPU the moment it was called.
+
+        Raises:
+            RuntimeError: If no cognitive loop was injected.
         """
+        if self._cognitive_loop is None:
+            raise RuntimeError(
+                "HarnessSupervisor has no cognitive loop attached. Build the "
+                "supervisor through build_container() or pass cognitive_loop= "
+                "explicitly; the supervisor does not implement its own loop."
+            )
+
         logger.info("cognitive_loop_starting")
+        if not self._cognitive_loop.is_running:
+            await self._cognitive_loop.start()
 
-        while self._is_running:
+        task = self._cognitive_loop._loop_task
+        if task is not None:
             try:
-                # Process events from the bus
-                if hasattr(self._event_bus, "get_event"):
-                    event = await self._event_bus.get_event(timeout=0.1)
-                    if event is not None:
-                        if hasattr(self._router, "route"):
-                            await self._router.route(event)
-
-                # Record heartbeat metric
-                if hasattr(self._monitor, "record_metric"):
-                    await self._monitor.record_metric(
-                        "cognitive_loop.iteration", 1.0
-                    )
-
-            except Exception:
-                logger.error(
-                    "cognitive_loop_iteration_error",
-                    exc_info=True,
-                )
+                await task
+            except asyncio.CancelledError:
+                pass
 
         logger.info("cognitive_loop_stopped")
 
@@ -389,6 +421,11 @@ class HarnessSupervisor:
                     action=action,
                     error=str(exc),
                 )
+
+    @property
+    def is_shut_down(self) -> bool:
+        """Whether shutdown() has run — the instance cannot serve again."""
+        return self._has_shut_down
 
     @property
     def status(self) -> dict[str, Any]:

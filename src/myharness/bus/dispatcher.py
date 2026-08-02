@@ -64,6 +64,10 @@ class EventBus:
         self._queue_task: asyncio.Task[Any] | None = None
         self._published_count: int = 0
         self._error_count: int = 0
+        # Exactly one component may drain _event_queue. Two concurrent
+        # consumers would silently steal events from each other, so the
+        # owner is claimed explicitly and conflicts raise instead of racing.
+        self._queue_consumer: str | None = None
         self._log = get_logger(__name__, component="event_bus")
 
     # ── Subscription Management ────────────────────────────────────
@@ -295,6 +299,70 @@ class EventBus:
             queue_depth=self._event_queue.qsize(),
         )
 
+    def claim_queue_consumer(self, owner: str) -> None:
+        """Claim exclusive ownership of the event queue.
+
+        The queue must have exactly one consumer. The built-in
+        process_queue() and an external cognitive loop draining via
+        get_event() are mutually exclusive designs: running both makes
+        each steal roughly half the events from the other, which is
+        invisible in logs and produces non-deterministic event loss.
+
+        Args:
+            owner: A stable identifier for the consuming component.
+
+        Raises:
+            EventBusError: If a different component already owns the queue.
+        """
+        if self._queue_consumer is not None and self._queue_consumer != owner:
+            raise EventBusError(
+                "Event queue already has a consumer "
+                f"({self._queue_consumer!r}); {owner!r} cannot also drain it. "
+                "Exactly one consumer is allowed — either the bus's own "
+                "process_queue() or an external cognitive loop, never both.",
+                code="QUEUE_CONSUMER_CONFLICT",
+                details={"current_owner": self._queue_consumer, "requested_by": owner},
+            )
+        self._queue_consumer = owner
+
+    def release_queue_consumer(self, owner: str) -> None:
+        """Release queue ownership previously claimed by ``owner``."""
+        if self._queue_consumer == owner:
+            self._queue_consumer = None
+
+    async def get_event(self, timeout: float = 0.1) -> BaseEvent | None:
+        """Pull the next event off the queue, or None if idle.
+
+        This is the consumer side of enqueue(). It is what the cognitive
+        loop uses to drive the Think → Plan → Execute pipeline one event
+        at a time.
+
+        The call always blocks for up to ``timeout`` seconds when the queue
+        is empty. That wait is what keeps a polling caller from spinning on
+        the CPU, so callers must not pass timeout=0.
+
+        Args:
+            timeout: Maximum seconds to wait for an event. Must be > 0.
+
+        Returns:
+            The next event, or None if the queue stayed empty.
+
+        Raises:
+            ValueError: If timeout is not positive.
+        """
+        if timeout <= 0:
+            raise ValueError(
+                f"get_event(timeout={timeout!r}) must be positive; a "
+                "non-blocking poll would busy-spin the caller's loop."
+            )
+        try:
+            event = await asyncio.wait_for(self._event_queue.get(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return None
+        # The caller owns the event from here on.
+        self._event_queue.task_done()
+        return event
+
     async def process_queue(self) -> None:
         """Process events from the queue one at a time.
 
@@ -304,6 +372,7 @@ class EventBus:
 
         Stops when the bus is no longer running and the queue is empty.
         """
+        self.claim_queue_consumer("event_bus.process_queue")
         self._log.info("queue_processor_started")
         while self._running or not self._event_queue.empty():
             try:
@@ -314,19 +383,31 @@ class EventBus:
                 continue
             except Exception:
                 self._log.exception("queue_processor_error")
+        self.release_queue_consumer("event_bus.process_queue")
         self._log.info("queue_processor_stopped")
 
-    async def start(self) -> None:
+    async def start(self, with_queue_processor: bool = True) -> None:
         """Start the event bus.
 
         Convenience method for the HarnessSupervisor boot sequence.
-        Launches the background queue processor if not already running.
+
+        Args:
+            with_queue_processor: Launch the built-in queue processor.
+                Pass False when an external cognitive loop drains the
+                queue via get_event() — the queue allows only one
+                consumer, and the cognitive loop is the one that routes
+                events through the Router rather than publishing raw.
         """
+        if not with_queue_processor:
+            self._running = True
+            self._log.info("event_bus_started", queue_processor=False)
+            return
+
         if self._queue_task is None or self._queue_task.done():
             self.start_queue_processor()
         else:
             self._running = True
-        self._log.info("event_bus_started")
+        self._log.info("event_bus_started", queue_processor=True)
 
     async def emit(self, event: BaseEvent) -> list[Any]:
         """Publish an event to all matching subscribers.
@@ -351,6 +432,9 @@ class EventBus:
         if self._queue_task is not None and not self._queue_task.done():
             return self._queue_task
 
+        # Claim synchronously so a consumer conflict surfaces to the caller
+        # instead of dying inside a background task nobody awaits.
+        self.claim_queue_consumer("event_bus.process_queue")
         self._running = True
         self._queue_task = asyncio.create_task(self.process_queue())
         self._log.info("queue_processor_task_started")
@@ -386,6 +470,11 @@ class EventBus:
     def queue_size(self) -> int:
         """Number of events waiting in the processing queue."""
         return self._event_queue.qsize()
+
+    @property
+    def queue_consumer(self) -> str | None:
+        """Identifier of the component currently draining the queue."""
+        return self._queue_consumer
 
     @property
     def published_count(self) -> int:

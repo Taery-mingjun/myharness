@@ -208,7 +208,24 @@ def build_container(settings: "Settings") -> "Container":
     container[ResourceScheduler] = Singleton(lambda c: ResourceScheduler())
     container[RuntimeMonitor] = RuntimeMonitor()
 
-    # ── Level 11: Harness Supervisor (depends on everything) ──────────
+    # ── Level 11: Runtime Layer (event loop, state, interrupts) ───────
+    from myharness.runtime.interrupt import InterruptHandler
+    from myharness.runtime.loop import EventLoop
+    from myharness.runtime.state import RuntimeState
+
+    container[RuntimeState] = Singleton(lambda c: RuntimeState())
+    container[InterruptHandler] = Singleton(lambda c: InterruptHandler(
+        llm_engine=c[LLMEngine],
+        skill_registry=c[SkillRegistry],
+    ))
+    container[EventLoop] = Singleton(lambda c: EventLoop(
+        event_bus=c[EventBus],
+        router=c[Router],
+        state=c[RuntimeState],
+        interrupt_handler=c[InterruptHandler],
+    ))
+
+    # ── Level 12: Harness Supervisor (depends on everything) ──────────
     from myharness.harness.supervisor import HarnessSupervisor
 
     container[HarnessSupervisor] = Singleton(lambda c: HarnessSupervisor(
@@ -221,6 +238,7 @@ def build_container(settings: "Settings") -> "Container":
         driver_manager=c[DriverManager],
         scheduler=c[ResourceScheduler],
         monitor=c[RuntimeMonitor],
+        cognitive_loop=c[EventLoop],
     ))
 
     logger.info(
