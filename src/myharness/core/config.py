@@ -80,6 +80,15 @@ class Settings(BaseSettings):
     # ── Data Storage ───────────────────────────────────────────────────
 
     data_dir: Path = Field(default=Path("./data"), description="Root data directory")
+    memory_fsync_appends: bool = Field(
+        default=True,
+        description=(
+            "Flush each memory append to the device before acknowledging it. "
+            "On by default because the rest of the system treats a returned "
+            "append as durable. Disable only on throughput-bound deployments "
+            "that accept losing the most recent entries on power loss."
+        ),
+    )
     embedding_dimension: int = Field(
         default=1536, description="Default embedding vector dimension"
     )

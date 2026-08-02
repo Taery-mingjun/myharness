@@ -59,6 +59,20 @@ class MemoryWriteError(MemoryError):
     """Raised when writing to memory storage fails."""
 
 
+class MemoryCorruptionError(MemoryError):
+    """Raised when source-of-truth data exists but cannot be parsed.
+
+    Deliberately distinct from :class:`MemoryNotFoundError`. Conflating
+    the two lets a caller treat damaged data as absent data, and the
+    usual response to absent data is to create it — which overwrites the
+    damaged original and destroys the only copy.
+    """
+
+
+class MemoryPathError(MemoryError):
+    """Raised when a store or key would resolve outside the memory root."""
+
+
 class IdentityConflictError(MemoryError):
     """Raised when an identity update conflicts with existing identity data."""
 

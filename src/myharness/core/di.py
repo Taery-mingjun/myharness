@@ -114,7 +114,12 @@ def build_container(settings: "Settings") -> "Container":
     from myharness.memory.indexing.vector import VectorIndex
     from myharness.memory.indexing.text import TextIndex
 
-    container[SourceOfTruth] = Singleton(lambda c: SourceOfTruth(settings.memory_source_dir))
+    container[SourceOfTruth] = Singleton(
+        lambda c: SourceOfTruth(
+            settings.memory_source_dir,
+            fsync_appends=settings.memory_fsync_appends,
+        )
+    )
     container[DerivedStorage] = Singleton(lambda c: DerivedStorage(
         settings.memory_derived_dir / "metadata.db"
     ))
