@@ -316,6 +316,32 @@ class EventBus:
                 self._log.exception("queue_processor_error")
         self._log.info("queue_processor_stopped")
 
+    async def start(self) -> None:
+        """Start the event bus.
+
+        Convenience method for the HarnessSupervisor boot sequence.
+        Launches the background queue processor if not already running.
+        """
+        if self._queue_task is None or self._queue_task.done():
+            self.start_queue_processor()
+        else:
+            self._running = True
+        self._log.info("event_bus_started")
+
+    async def emit(self, event: BaseEvent) -> list[Any]:
+        """Publish an event to all matching subscribers.
+
+        Convenience alias for publish(), used by the supervisor for
+        system lifecycle events (startup/shutdown).
+
+        Args:
+            event: The event to emit.
+
+        Returns:
+            List of handler results.
+        """
+        return await self.publish(event)
+
     def start_queue_processor(self) -> asyncio.Task[Any]:
         """Start the queue processor as a background asyncio task.
 
