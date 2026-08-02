@@ -63,6 +63,16 @@ class MemoryManager(MemorySystem):
         # text-only search rather than silently storing un-indexed vectors.
         self._embedder = embedder or NullEmbedder()
 
+        # Set once close() runs. Readiness probes consult this: once the
+        # backends are closed the instance can no longer serve traffic and
+        # must stop being advertised as ready.
+        self._closed = False
+
+    @property
+    def is_closed(self) -> bool:
+        """Whether close() has released the backing stores."""
+        return self._closed
+
     # ── Identity ────────────────────────────────────────────────────────
 
     async def get_identity(self) -> IdentityEntry:
@@ -422,4 +432,5 @@ class MemoryManager(MemorySystem):
                     exc_info=True,
                 )
 
+        self._closed = True
         logger.info("memory_manager_closed", backends_closed=len(backends))

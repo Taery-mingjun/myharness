@@ -193,3 +193,54 @@ class TestCrossRequestState:
         body = response.json()
         assert isinstance(body["episodes"], list)
         assert isinstance(body["count"], int)
+
+
+class TestHealthProbesReflectRealState:
+    """Health probes are unauthenticated and drive traffic routing.
+
+    They used to return a hardcoded 200 ("in MVP, this is always true after
+    startup"). After ``POST /harness/shutdown`` the supervisor was stopped
+    and every memory backend was closed, yet both probes still answered
+    200 — so a load balancer kept sending traffic to a dead instance.
+    """
+
+    async def test_probes_are_green_on_a_serving_instance(self, api_client):
+        for path in ("/health", "/health/ready"):
+            response = api_client.get(path)
+            assert response.status_code == 200, f"{path} -> {response.text}"
+            assert response.json()["service"] == "myharness"
+
+    async def test_probes_fail_after_shutdown(self, api_client):
+        from myharness.api.dependencies import get_container
+        from myharness.harness.supervisor import HarnessSupervisor
+
+        supervisor = get_container().resolve(HarnessSupervisor)
+        await supervisor.shutdown()
+
+        liveness = api_client.get("/health")
+        assert liveness.status_code == 503, (
+            "a shut-down instance still reported itself alive — an "
+            "orchestrator would keep it in the pool"
+        )
+        assert liveness.json()["status"] == "unhealthy"
+
+        readiness = api_client.get("/health/ready")
+        assert readiness.status_code == 503
+        assert readiness.json()["status"] == "not_ready"
+
+    async def test_readiness_fails_when_memory_is_closed(self, api_client):
+        """Readiness must track capability, not just a boolean flag."""
+        from myharness.api.dependencies import get_container
+        from myharness.memory.interface import MemorySystem
+
+        memory = get_container().resolve(MemorySystem)
+        assert memory.is_closed is False
+        await memory.close()
+        assert memory.is_closed is True
+
+        response = api_client.get("/health/ready")
+        assert response.status_code == 503
+        assert "Memory subsystem is closed" in response.json()["detail"]
+
+        # Liveness stays green: the process itself is still viable.
+        assert api_client.get("/health").status_code == 200
