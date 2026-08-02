@@ -59,7 +59,41 @@ src/myharness/
 ├── llm/           # LLM 引擎 (多Provider适配)
 ├── skill/         # 能力商店
 ├── harness/       # 核心枢纽层
+│   ├── supervisor.py    # 中央编排器
+│   ├── guard.py         # 执行权限门
+│   ├── healing.py       # 自愈合（DriftDetector + RollbackManager）
+│   └── reflex.py        # 小脑反射层（§6.5）
 ├── runtime/       # 运行时循环
 ├── driver/        # 执行驱动抽象
 └── api/           # FastAPI REST API
 ```
+
+## Reflex Layer（小脑反射层，架构 v1.2 §6.5）
+
+Stable Skill 经过连续成功调用达到阈值后，可被晋升到 Reflex Index。
+晋升后的 Skill 在匹配到触发指纹时直接执行，跳过 think→plan 完整流程，
+LLM 仅做参数填充。
+
+- **晋升条件**：Skill 状态为 Stable + DriftDetector 记录连续成功 ≥5 次
+- **触发方式**：关键词匹配（支持 CJK）或正则规则
+- **时间复杂度**：O(k)，k = 反射索引中的触发器数量，不随 Memory 或 Skill Store 总量增长
+- **降级安全**：未命中时无缝放行到完整认知流程
+
+```python
+from myharness.harness.reflex import ReflexIndex
+
+reflex = ReflexIndex(skill_store=store, drift_detector=detector)
+await reflex.promote_to_reflex(skill_id)  # 需满足晋升条件
+
+match = reflex.match(user_message)  # O(k) 查找
+if match:
+    # 直接执行 skill，跳过 think/plan
+else:
+    # 放行到完整 think→plan→reflect 流程
+```
+
+## 自愈合机制（Phase 1）
+
+- **DriftDetector**：SQLite 持久化采集 Skill 成功率、Identity 否决次数、异常响应率
+- **RollbackManager**：生成回滚候选，人工确认后才执行回滚
+- 触发条件：连续 N 次失败（默认 5，可配置）

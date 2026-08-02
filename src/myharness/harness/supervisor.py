@@ -50,6 +50,7 @@ class HarnessSupervisor:
         monitor: Any,
         cognitive_loop: Any = None,
         execution_guard: Any = None,
+        reflex_index: Any = None,
     ) -> None:
         """Initialize the harness supervisor.
 
@@ -88,6 +89,11 @@ class HarnessSupervisor:
         # guard is built when none is supplied. Pass an explicit guard to
         # attach RBAC or to run in audit-only mode.
         self._execution_guard = execution_guard or ExecutionGuard()
+
+        # Reflex Layer (§6.5): low-latency skill triggering for Stable skills.
+        # When non-None, incoming messages are checked against the reflex index
+        # before entering the full think→plan→reflect pipeline.
+        self._reflex_index = reflex_index
 
         self._boot_time: float = 0.0
         self._is_running = False
@@ -264,6 +270,68 @@ class HarnessSupervisor:
         )
 
         try:
+            # Stage 0: Reflex Layer check (§6.5) — before full cognition.
+            # If a Stable skill's trigger matches, execute directly with
+            # LLM only for parameter filling. This bypasses think→plan.
+            if self._reflex_index is not None:
+                match = self._reflex_index.match(message)
+                if match is not None:
+                    reflex_start = time.monotonic()
+                    logger.info(
+                        "reflex_hit",
+                        skill_id=match.skill_id,
+                        skill_name=match.skill_name,
+                        user_id=user_id,
+                    )
+                    # Fetch the full skill definition
+                    skill = await self._skill_store.get(match.skill_id)
+                    if skill is not None:
+                        # LLM parameter extraction (lightweight, not full think)
+                        param_prompt = (
+                            f"Extract parameters for skill '{skill.name}' "
+                            f"from this user message: '{message}'. "
+                            f"Skill description: {skill.description}. "
+                            f"Return ONLY a JSON object with parameter names "
+                            f"and values. If no parameters needed, return {{}}."
+                        )
+                        try:
+                            raw_params = await self._llm_engine.think(
+                                query=param_prompt,
+                                context={"query": param_prompt, "identity": {}, "memories": []},
+                            )
+                            import json as _json
+                            try:
+                                params = _json.loads(raw_params.strip())
+                            except _json.JSONDecodeError:
+                                # Fallback: try extracting JSON from text
+                                start = raw_params.find("{")
+                                end = raw_params.rfind("}") + 1
+                                params = _json.loads(raw_params[start:end]) if start >= 0 else {}
+                        except Exception:
+                            params = {}
+
+                        reflex_ms = (time.monotonic() - reflex_start) * 1000
+                        logger.info(
+                            "reflex_executed",
+                            skill_name=skill.name,
+                            duration_ms=round(reflex_ms, 2),
+                            params=params,
+                        )
+
+                        # Record the reflex execution as an episode
+                        await self._memory.record_episode(
+                            EpisodicEntry(
+                                summary=f"Reflex: {skill.name} triggered",
+                                category="interaction",
+                                detail=f"User: {message}\nReflex skill: {skill.name}\nParams: {params}",
+                                participants=[user_id],
+                                tags=["reflex", skill.name],
+                                importance=0.5,
+                            )
+                        )
+
+                        return f"[reflex:{skill.name}] Executed with params: {params}"
+
             # Stage 1: Record the user message as an episodic entry
             await self._memory.record_episode(
                 EpisodicEntry(
