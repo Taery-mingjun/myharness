@@ -27,6 +27,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import threading
+import time
 import uuid
 from collections.abc import AsyncIterator, Collection
 from pathlib import Path
@@ -47,6 +49,24 @@ logger = get_logger(__name__)
 #: that could introduce a new path segment, escape upwards, or truncate
 #: the path at the OS layer.
 _FORBIDDEN_IN_SEGMENT = ("/", "\\", "\x00")
+
+
+def _replace_with_retry(src: Path, dst: Path, attempts: int = 20) -> None:
+    """Replace ``dst`` with ``src``, retrying brief Windows lockouts.
+
+    On Windows, ``os.replace`` fails with PermissionError (WinError 5)
+    when the destination is momentarily held by another thread's
+    concurrent replace — common when several writers target one key.
+    The lock is transient, so retry for a bounded time before giving up.
+    """
+    for attempt in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.01)
 
 
 def _as_int(value: Any) -> int:
@@ -91,6 +111,10 @@ class SourceOfTruth:
         self._base_path = Path(base_path).resolve()
         self._fsync_appends = fsync_appends
         self._ensure_store_dirs()
+        # Serializes JSONL appends. Windows O_APPEND is seek-then-write
+        # rather than atomic, so concurrent appends from the thread pool
+        # can overwrite each other and silently drop entries.
+        self._append_lock = threading.Lock()
 
     def _ensure_store_dirs(self) -> None:
         """Create per-store directories if they don't exist."""
@@ -202,7 +226,7 @@ class SourceOfTruth:
                     f.write(payload)
                     f.flush()
                     os.fsync(f.fileno())
-                os.replace(tmp_path, file_path)
+                _replace_with_retry(tmp_path, file_path)
                 self._fsync_dir(file_path.parent)
 
             await asyncio.to_thread(_write_durably)
@@ -368,17 +392,20 @@ class SourceOfTruth:
             fsync = self._fsync_appends
 
             def _append_durably() -> None:
-                # O_APPEND makes the seek-and-write atomic against other
-                # appenders, and one write() call keeps the line intact.
-                fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
-                try:
-                    written = 0
-                    while written < len(payload):
-                        written += os.write(fd, payload[written:])
-                    if fsync:
-                        os.fsync(fd)
-                finally:
-                    os.close(fd)
+                # The lock serializes concurrent appenders: on Windows,
+                # O_APPEND is seek-then-write, so two writers can land on
+                # the same offset and one entry silently overwrites the
+                # other. One write() call keeps the line intact.
+                with self._append_lock:
+                    fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+                    try:
+                        written = 0
+                        while written < len(payload):
+                            written += os.write(fd, payload[written:])
+                        if fsync:
+                            os.fsync(fd)
+                    finally:
+                        os.close(fd)
 
             await asyncio.to_thread(_append_durably)
 

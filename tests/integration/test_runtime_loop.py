@@ -21,7 +21,6 @@ The tests below pin every one of those down.
 from __future__ import annotations
 
 import asyncio
-import resource
 import time
 
 import pytest
@@ -37,8 +36,9 @@ pytestmark = pytest.mark.asyncio
 
 
 def _cpu_time() -> float:
-    r = resource.getrusage(resource.RUSAGE_SELF)
-    return r.ru_utime + r.ru_stime
+    # time.process_time(): cross-platform CPU time (user + system), replaces
+    # the Unix-only resource.getrusage() used previously.
+    return time.process_time()
 
 
 def _msg(i: int = 0) -> UserMessageEvent:
