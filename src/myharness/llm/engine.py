@@ -26,7 +26,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from jinja2 import BaseLoader, Environment
+from jinja2 import BaseLoader, Environment, StrictUndefined
 
 from myharness.core.exceptions import ProviderError, TokenLimitError
 from myharness.llm.context import ContextBuilder
@@ -46,7 +46,7 @@ from myharness.schema.skill import SkillProposal
 logger = structlog.get_logger(__name__)
 
 # Jinja2 environment for prompt rendering
-_jinja_env = Environment(loader=BaseLoader(), autoescape=False)
+_jinja_env = Environment(loader=BaseLoader(), autoescape=False, undefined=StrictUndefined)
 
 
 # ── Structured Output Types ────────────────────────────────────────────
@@ -227,14 +227,21 @@ class LLMEngine:
 
         Args:
             query: The question or topic to reason about.
-            context: Optional pre-built context. If None, context is
-                built from the Memory System via ContextBuilder.
+            context: Optional extra context to merge ON TOP of the
+                ContextBuilder output. If None, only ContextBuilder
+                is used. If provided, its keys are merged into the
+                ContextBuilder result (extra context does not replace
+                identity/agent_name/etc.).
 
         Returns:
             The LLM's reasoned response as a string.
         """
-        if context is None:
-            context = await self._context.build_think_context(query)
+        # Always start with ContextBuilder so identity, agent_name,
+        # and other required template variables are present.
+        base_context = await self._context.build_think_context(query)
+        if context:
+            base_context.update(context)
+        context = base_context
 
         # Render the system prompt
         system_prompt = _jinja_env.from_string(THINK_SYSTEM_PROMPT).render(**context)
@@ -271,6 +278,10 @@ class LLMEngine:
         """
         if context is None:
             context = await self._context.build_think_context(query)
+        else:
+            base = await self._context.build_think_context(query)
+            base.update(context)
+            context = base
 
         system_prompt = _jinja_env.from_string(THINK_SYSTEM_PROMPT).render(**context)
 

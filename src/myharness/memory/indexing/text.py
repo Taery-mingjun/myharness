@@ -117,10 +117,13 @@ class TextIndex(BaseIndexer):
             for row in rows:
                 entry_id = row[0]
                 bm25_rank = row[1]
-                meta = {}
+                store = row[2] or "unknown"
+                meta: dict[str, Any] = {"store": store}
                 if row[3]:
                     try:
-                        meta = json.loads(row[3])
+                        parsed = json.loads(row[3])
+                        if isinstance(parsed, dict):
+                            meta.update(parsed)
                     except json.JSONDecodeError:
                         pass
                 # BM25 rank is negative; normalize to [0,1]

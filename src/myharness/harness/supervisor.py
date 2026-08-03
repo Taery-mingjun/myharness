@@ -370,18 +370,23 @@ class HarnessSupervisor:
                 {"name": s.name, "capability": s.capability, "driver_type": s.driver_type}
                 for s in available_skills
             ]
-            plan = await self._llm_engine.plan(thought or message, skill_summaries, context=context)
+            # Do NOT pass context= here — let LLMEngine.plan() call
+            # build_plan_context(goal, available_skills) internally so the
+            # plan prompt template gets the correct identity + skill list.
+            plan = await self._llm_engine.plan(thought or message, skill_summaries)
 
             # Stage 5: Execute (if plan has steps)
             if plan and getattr(plan, "steps", None):
                 await self._execute_plan(plan, context)
 
             # Stage 6: Reflect on the interaction
+            # Keys must align with llm/prompts/reflect.py template:
+            # experience.summary, experience.detail, experience.tags
             reflection = await self._llm_engine.reflect(
                 experience={
-                    "user_message": message,
-                    "thought": thought,
-                    "plan": getattr(plan, "reasoning", ""),
+                    "summary": f"User said: {message[:200]}",
+                    "detail": f"User: {message}\nThought: {thought}\nPlan: {getattr(plan, 'reasoning', '')}",
+                    "tags": ["interaction_complete", "reflection"],
                 }
             )
 
